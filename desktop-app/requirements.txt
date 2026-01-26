@@ -1,0 +1,20 @@
+# Translation Processor Desktop App Requirements
+
+# GUI Framework
+tkinterdnd2==0.3.0
+
+# Document Processing
+python-docx==1.1.0
+docx2pdf==0.1.8
+
+# PDF Generation and Manipulation
+pypdf==3.17.4
+reportlab==4.0.7
+pillow==10.1.0
+
+# Data Management
+requests==2.31.0
+
+# Utilities
+python-dateutil==2.8.2
+pywin32==306
