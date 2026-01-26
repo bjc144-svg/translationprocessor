@@ -50,22 +50,30 @@ You should have these files in a folder:
 
 **This is the most common issue!** If you can see the page locally but others cannot, Windows Firewall is blocking port 5000.
 
-**QUICK FIX - Use the automated scripts:**
+**QUICK DIAGNOSTIC - Run these tools in order:**
 
-1. **Check if firewall is the problem:**
-   - Run `check-firewall.bat` (no admin needed)
-   - This shows if the firewall rule exists
+1. **On the SERVER machine:**
+   - Run `diagnose-connection.bat` - comprehensive diagnostic tool
+   - Shows server status, correct IP address, firewall status
+   - Identifies the specific problem
 
-2. **Fix the firewall automatically:**
+2. **If firewall rule is missing:**
    - Right-click `fix-firewall.bat`
    - Select "Run as administrator"
    - Follow the prompts
-   - Done! ✓
 
-3. **Detailed troubleshooting:**
-   - Read `FIREWALL-FIX.md` for complete guide
-   - Includes manual steps if automated fix doesn't work
-   - Covers third-party antivirus, corporate networks, etc.
+3. **If you need the correct IP address:**
+   - Run `show-all-ips.bat` to see all network adapters
+   - Use the 192.168.x.x or 10.x.x.x address (NOT 127.0.0.1)
+
+4. **On CLIENT machines (users trying to connect):**
+   - Copy `test-connection-from-client.bat` to their computer
+   - Run it and enter server IP when prompted
+   - This tests if they can reach your server
+
+5. **Still not working?**
+   - Read `FIREWALL-FIX.md` for complete troubleshooting guide
+   - Covers third-party antivirus, corporate networks, VPNs, etc.
 
 **Manual firewall rule (if scripts don't work):**
 - Open Command Prompt as Administrator

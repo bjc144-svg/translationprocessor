@@ -59,11 +59,22 @@ If the automated script doesn't work, follow these manual steps:
 After adding the firewall rule:
 
 1. **Start the server** (run `start.bat`)
-2. **Note your IP address** (shown in the server output)
-3. **From another computer on the network**, open a web browser
-4. Navigate to: `http://[YOUR-IP]:5000`
+2. **Get your correct IP address**:
+   - Run `show-all-ips.bat` to see all available IPs
+   - Look for one like 192.168.x.x or 10.x.x.x
+   - NOT 127.0.0.1 or 169.254.x.x
+3. **Run diagnostic tool**:
+   - Run `diagnose-connection.bat` on the SERVER
+   - This will verify everything is configured correctly
+   - It checks server status, firewall, and shows correct IP
+4. **From another computer on the network**:
+   - Run `test-connection-from-client.bat` on the CLIENT machine
+   - Enter the server's IP address when prompted
+   - This will test if connection is possible
+5. **If test passes**, open a web browser and go to:
+   - `http://[YOUR-IP]:5000`
    - Example: `http://192.168.1.100:5000`
-5. You should see the success page!
+6. You should see the success page!
 
 ---
 

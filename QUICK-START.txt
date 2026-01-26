@@ -65,11 +65,15 @@ README.md              - Full documentation
   STILL HAVING ISSUES?
 ═══════════════════════════════════════════════════════════
 
-1. Run "check-firewall.bat" to diagnose
-2. Read "FIREWALL-FIX.md" for detailed help
-3. Check third-party antivirus settings
-4. Verify all computers are on same network
-5. For corporate networks, contact IT department
+SERVER machine - run these diagnostic tools:
+  → diagnose-connection.bat   (complete diagnostic)
+  → show-all-ips.bat          (find correct IP address)
+  → check-firewall.bat        (check firewall rule)
+
+CLIENT machines - run this test:
+  → test-connection-from-client.bat (test connectivity)
+
+Then read "FIREWALL-FIX.md" for detailed troubleshooting
 
 
 ═══════════════════════════════════════════════════════════
