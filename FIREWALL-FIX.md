@@ -87,9 +87,12 @@ If the firewall rule is added but connections still fail:
 - Check their settings and allow Python or port 5000
 
 ### Check 2: Network Configuration
-- Ensure both computers are on the **same network**
+- Ensure both computers are on the **same network** (same subnet like 192.168.1.x)
 - Not connected through VPN
 - Not on separate VLANs (corporate networks)
+- **Router isolation:** If server is on wired Ethernet and clients are on WiFi (or vice versa), the router may be blocking communication between them
+  - See **ROUTER-ISOLATION-FIX.md** for complete guide on fixing this
+  - Common issue: AP Isolation, Client Isolation, or Wireless Isolation enabled on router
 
 ### Check 3: Server is Actually Running
 - Run `check-firewall.bat` to verify port 5000 is listening

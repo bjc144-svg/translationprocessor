@@ -71,7 +71,13 @@ You should have these files in a folder:
    - Run it and enter server IP when prompted
    - This tests if they can reach your server
 
-5. **Still not working?**
+5. **Router Isolation (Wired vs WiFi):**
+   - If server is on wired and clients are on WiFi (or vice versa)
+   - Router may block communication between wired/wireless devices
+   - Read `ROUTER-ISOLATION-FIX.md` for complete guide
+   - Quick fix: Connect everyone to same network type (all WiFi or all wired)
+
+6. **Still not working?**
    - Read `FIREWALL-FIX.md` for complete troubleshooting guide
    - Covers third-party antivirus, corporate networks, VPNs, etc.
 

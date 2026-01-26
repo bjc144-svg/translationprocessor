@@ -73,7 +73,9 @@ SERVER machine - run these diagnostic tools:
 CLIENT machines - run this test:
   → test-connection-from-client.bat (test connectivity)
 
-Then read "FIREWALL-FIX.md" for detailed troubleshooting
+Common issues and guides:
+  → FIREWALL-FIX.md           (Windows Firewall blocking)
+  → ROUTER-ISOLATION-FIX.md   (Wired vs WiFi isolation)
 
 
 ═══════════════════════════════════════════════════════════
