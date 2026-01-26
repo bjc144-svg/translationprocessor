@@ -46,16 +46,30 @@ You should have these files in a folder:
 - Python is not installed or not in PATH
 - Reinstall Python and check "Add Python to PATH"
 
-### Can't access from other machines
-1. Check Windows Firewall:
-   - Open "Windows Defender Firewall"
-   - Click "Allow an app through firewall"
-   - May need to allow Python or port 5000
-2. Try adding a firewall rule:
-   - Open Command Prompt as Administrator
-   - Run: `netsh advfirewall firewall add rule name="Python Web Test" dir=in action=allow protocol=TCP localport=5000`
-3. Check antivirus/security software settings
-4. Verify both machines are on the same network
+### ⚠️ Can't access from other machines (FIREWALL BLOCKING)
+
+**This is the most common issue!** If you can see the page locally but others cannot, Windows Firewall is blocking port 5000.
+
+**QUICK FIX - Use the automated scripts:**
+
+1. **Check if firewall is the problem:**
+   - Run `check-firewall.bat` (no admin needed)
+   - This shows if the firewall rule exists
+
+2. **Fix the firewall automatically:**
+   - Right-click `fix-firewall.bat`
+   - Select "Run as administrator"
+   - Follow the prompts
+   - Done! ✓
+
+3. **Detailed troubleshooting:**
+   - Read `FIREWALL-FIX.md` for complete guide
+   - Includes manual steps if automated fix doesn't work
+   - Covers third-party antivirus, corporate networks, etc.
+
+**Manual firewall rule (if scripts don't work):**
+- Open Command Prompt as Administrator
+- Run: `netsh advfirewall firewall add rule name="Translation Processor" dir=in action=allow protocol=TCP localport=5000`
 
 ### Server won't start
 - Make sure port 5000 isn't already in use
