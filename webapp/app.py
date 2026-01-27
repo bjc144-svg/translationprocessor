@@ -264,14 +264,71 @@ def add_translator():
     if 'signature' in request.files:
         signature_file = request.files['signature']
         if signature_file and signature_file.filename:
-            # Save signature
-            sig_filename = secure_filename(f"{name.replace(' ', '_')}.png")
-            sig_path = DATA_FOLDER / 'signatures' / sig_filename
-            signature_file.save(sig_path)
-            signature_path = str(sig_path)
+            # Save to temporary upload folder first
+            original_filename = secure_filename(signature_file.filename)
+            file_ext = os.path.splitext(original_filename)[1]
+            temp_filename = f"temp_{datetime.now().strftime('%Y%m%d%H%M%S')}_{name.replace(' ', '_')}{file_ext}"
+            temp_path = UPLOAD_FOLDER / temp_filename
+            signature_file.save(temp_path)
+            signature_path = str(temp_path)
 
     # Add translator
     success, message = translator_manager.add_translator(name, pairs, signature_path)
+
+    # Clean up temporary file
+    if signature_path and Path(signature_path).exists():
+        try:
+            Path(signature_path).unlink()
+        except:
+            pass
+
+    if success:
+        flash(message, 'success')
+    else:
+        flash(message, 'error')
+
+    return redirect(url_for('translators'))
+
+@app.route('/translators/update/<old_name>', methods=['POST'])
+def update_translator(old_name):
+    """Update existing translator"""
+
+    new_name = request.form.get('name', '').strip()
+    language_pairs = request.form.get('language_pairs', '').strip()
+
+    if not new_name:
+        flash('Translator name is required', 'error')
+        return redirect(url_for('translators'))
+
+    if not language_pairs:
+        flash('At least one language pair is required', 'error')
+        return redirect(url_for('translators'))
+
+    # Parse language pairs (one per line)
+    pairs = [line.strip() for line in language_pairs.split('\n') if line.strip()]
+
+    # Handle signature upload
+    signature_path = None
+    if 'signature' in request.files:
+        signature_file = request.files['signature']
+        if signature_file and signature_file.filename:
+            # Save to temporary upload folder first
+            original_filename = secure_filename(signature_file.filename)
+            file_ext = os.path.splitext(original_filename)[1]
+            temp_filename = f"temp_{datetime.now().strftime('%Y%m%d%H%M%S')}_{new_name.replace(' ', '_')}{file_ext}"
+            temp_path = UPLOAD_FOLDER / temp_filename
+            signature_file.save(temp_path)
+            signature_path = str(temp_path)
+
+    # Update translator
+    success, message = translator_manager.update_translator(old_name, new_name, pairs, signature_path)
+
+    # Clean up temporary file
+    if signature_path and Path(signature_path).exists():
+        try:
+            Path(signature_path).unlink()
+        except:
+            pass
 
     if success:
         flash(message, 'success')
