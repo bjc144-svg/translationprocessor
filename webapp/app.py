@@ -114,6 +114,8 @@ def process_document():
 
     # Get form data
     case_number = request.form.get('case_number', '').strip()
+    division = request.form.get('division', '').strip()
+    description = request.form.get('description', '').strip()
     source_language = request.form.get('source_language', '').strip()
     target_language = request.form.get('target_language', '').strip()
     translator_name = request.form.get('translator', '').strip()
@@ -123,6 +125,10 @@ def process_document():
     errors = []
     if not case_number:
         errors.append('Case number is required')
+    if not division:
+        errors.append('Division is required')
+    if not description:
+        errors.append('Description is required')
     if not source_language:
         errors.append('Source language is required')
     if not target_language:
@@ -147,6 +153,8 @@ def process_document():
     # Prepare metadata
     metadata = {
         'case_number': case_number,
+        'division': division,
+        'description': description,
         'source_language': source_language,
         'target_language': target_language,
         'language_pair': f"{source_language} > {target_language} Translation",
@@ -157,7 +165,7 @@ def process_document():
 
     # Process document
     input_path = app.config['UPLOAD_FOLDER'] / uploaded_file
-    output_filename = f"Park_Case_{case_number}_Certified.pdf"
+    output_filename = f"{case_number}_{description}_TRANSLATION.pdf"
     output_path = app.config['OUTPUT_FOLDER'] / output_filename
 
     try:

@@ -480,7 +480,7 @@ Case Number: Park Case #{metadata['case_number']}
         sig_para = doc.add_paragraph("_" * 40)
         sig_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
-        sig_label = doc.add_paragraph("Translator Signature")
+        sig_label = doc.add_paragraph(metadata['translator_name'])
         sig_label.alignment = WD_ALIGN_PARAGRAPH.LEFT
         sig_label.runs[0].font.size = Pt(10)
         sig_label.runs[0].font.italic = True
@@ -666,6 +666,16 @@ This certification is provided by Park Evaluation Services in the regular course
         # Start with the first document (translation with header/footer)
         combined = Document(doc_paths[0])
 
+        # Set the first section to restart page numbering at 1
+        # This ensures page numbers in the translation section don't include certificate pages
+        first_section = combined.sections[0]
+        sectPr = first_section._sectPr
+        pgNumType = sectPr.find(qn('w:pgNumType'))
+        if pgNumType is None:
+            pgNumType = OxmlElement('w:pgNumType')
+            sectPr.append(pgNumType)
+        pgNumType.set(qn('w:start'), '1')
+
         # Add remaining documents (certificates)
         for idx, doc_path in enumerate(doc_paths[1:], start=1):
             # Read the document to append
@@ -683,6 +693,15 @@ This certification is provided by Park Evaluation Services in the regular course
                 paragraph.clear()
             for paragraph in new_section.footer.paragraphs:
                 paragraph.clear()
+
+            # Restart page numbering for this section at 1
+            # This ensures certificates don't continue the page count from translation pages
+            sectPr = new_section._sectPr
+            pgNumType = sectPr.find(qn('w:pgNumType'))
+            if pgNumType is None:
+                pgNumType = OxmlElement('w:pgNumType')
+                sectPr.append(pgNumType)
+            pgNumType.set(qn('w:start'), '1')
 
             # Copy all paragraphs from sub_doc
             for paragraph in sub_doc.paragraphs:
