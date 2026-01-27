@@ -47,6 +47,21 @@
                 <input type="text" id="caseNumber" name="case_number" required placeholder="e.g., 12345">
             </div>
 
+            <div class="form-group">
+                <label for="division">Division: <span class="required">*</span></label>
+                <select id="division" name="division" required>
+                    <option value="PARK" selected>PARK</option>
+                    <option value="EEI">EEI</option>
+                </select>
+            </div>
+
+            <!-- Description field will be included in the resultant PDF filename -->
+            <div class="form-group">
+                <label for="description">Description: <span class="required">*</span></label>
+                <input type="text" id="description" name="description" required placeholder="e.g., CONTRACT" maxlength="10">
+                <small>Maximum 10 characters - will be included in PDF filename</small>
+            </div>
+
             <div class="form-row">
                 <div class="form-group">
                     <label for="sourceLanguage">Source Language: <span class="required">*</span></label>
@@ -55,7 +70,11 @@
 
                 <div class="form-group">
                     <label for="targetLanguage">Target Language: <span class="required">*</span></label>
-                    <input type="text" id="targetLanguage" name="target_language" list="languagesList" required value="English">
+                    <select id="targetLanguage" name="target_language" required>
+                        {% for language in languages %}
+                            <option value="{{ language }}" {% if language == "English" %}selected{% endif %}>{{ language }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
             </div>
 
