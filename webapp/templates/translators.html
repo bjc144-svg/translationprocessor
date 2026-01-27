@@ -67,13 +67,45 @@
         {% endif %}
     </div>
 
+    <!-- Language Management -->
+    <div class="card">
+        <h3>Language Management</h3>
+        <p>Manage the languages available in source and target language dropdowns</p>
+
+        <form action="{{ url_for('add_language') }}" method="post" id="addLanguageForm" style="margin-bottom: 2rem;">
+            <div class="form-group">
+                <label for="language">Add New Language:</label>
+                <div style="display: flex; gap: 0.5rem;">
+                    <input type="text" id="language" name="language" required placeholder="e.g., Mandarin" style="flex: 1;">
+                    <button type="submit" class="btn btn-primary">Add Language</button>
+                </div>
+            </div>
+        </form>
+
+        <div class="languages-grid">
+            {% if languages %}
+                {% for language in languages %}
+                    <div class="language-item">
+                        <span>{{ language }}</span>
+                        <form action="{{ url_for('delete_language', language=language) }}" method="post" style="display:inline;">
+                            <button type="submit" class="btn btn-danger btn-small" onclick="return confirm('Delete {{ language }}?');">×</button>
+                        </form>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p class="text-muted">No languages configured</p>
+            {% endif %}
+        </div>
+    </div>
+
     <!-- Instructions -->
     <div class="card info-card">
         <h3>Tips</h3>
         <ul class="instructions">
             <li><strong>Name:</strong> Enter translator's full name as it should appear on certificates</li>
             <li><strong>Signature:</strong> Upload a clear signature image (PNG with transparent background recommended)</li>
-            <li><strong>Shared Database:</strong> All translators added here are available to all users on the network</li>
+            <li><strong>Languages:</strong> Add languages to make them available in the source/target language dropdowns on the main page</li>
+            <li><strong>Shared Database:</strong> All translators and languages added here are available to all users on the network</li>
         </ul>
     </div>
 
@@ -159,6 +191,34 @@ window.onclick = function(event) {
 .translator-actions {
     display: flex;
     gap: 0.5rem;
+}
+
+.languages-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.language-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+}
+
+.language-item span {
+    flex: 1;
+}
+
+.language-item .btn-small {
+    margin-left: 0.5rem;
+    padding: 0.125rem 0.5rem;
+    font-size: 1.2rem;
+    line-height: 1;
 }
 </style>
 
