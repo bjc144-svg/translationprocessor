@@ -209,7 +209,11 @@ def download():
         flash('No processed document available', 'error')
         return redirect(url_for('index'))
 
-    return render_template('download.html', filename=output_file)
+    return render_template(
+        'download.html',
+        filename=output_file,
+        current_date=datetime.now().strftime("%B %d, %Y")
+    )
 
 @app.route('/download/<filename>')
 def download_file(filename):
