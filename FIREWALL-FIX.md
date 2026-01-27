@@ -59,11 +59,22 @@ If the automated script doesn't work, follow these manual steps:
 After adding the firewall rule:
 
 1. **Start the server** (run `start.bat`)
-2. **Note your IP address** (shown in the server output)
-3. **From another computer on the network**, open a web browser
-4. Navigate to: `http://[YOUR-IP]:5000`
+2. **Get your correct IP address**:
+   - Run `show-all-ips.bat` to see all available IPs
+   - Look for one like 192.168.x.x or 10.x.x.x
+   - NOT 127.0.0.1 or 169.254.x.x
+3. **Run diagnostic tool**:
+   - Run `diagnose-connection.bat` on the SERVER
+   - This will verify everything is configured correctly
+   - It checks server status, firewall, and shows correct IP
+4. **From another computer on the network**:
+   - Run `test-connection-from-client.bat` on the CLIENT machine
+   - Enter the server's IP address when prompted
+   - This will test if connection is possible
+5. **If test passes**, open a web browser and go to:
+   - `http://[YOUR-IP]:5000`
    - Example: `http://192.168.1.100:5000`
-5. You should see the success page!
+6. You should see the success page!
 
 ---
 
@@ -76,9 +87,12 @@ If the firewall rule is added but connections still fail:
 - Check their settings and allow Python or port 5000
 
 ### Check 2: Network Configuration
-- Ensure both computers are on the **same network**
+- Ensure both computers are on the **same network** (same subnet like 192.168.1.x)
 - Not connected through VPN
 - Not on separate VLANs (corporate networks)
+- **Router isolation:** If server is on wired Ethernet and clients are on WiFi (or vice versa), the router may be blocking communication between them
+  - See **ROUTER-ISOLATION-FIX.md** for complete guide on fixing this
+  - Common issue: AP Isolation, Client Isolation, or Wireless Isolation enabled on router
 
 ### Check 3: Server is Actually Running
 - Run `check-firewall.bat` to verify port 5000 is listening
