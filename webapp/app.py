@@ -24,7 +24,7 @@ UPLOAD_FOLDER = Path(__file__).parent / 'uploads'
 OUTPUT_FOLDER = Path(__file__).parent / 'output'
 DATA_FOLDER = Path(__file__).parent / 'data'
 ASSETS_FOLDER = Path(__file__).parent / 'assets'
-ALLOWED_EXTENSIONS = {'docx'}
+ALLOWED_EXTENSIONS = {'docx', 'doc'}
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
 
 # Ensure directories exist
@@ -78,7 +78,7 @@ def upload_file():
 
     # Validate file
     if not allowed_file(file.filename):
-        flash('Invalid file type. Please upload a .docx file', 'error')
+        flash('Invalid file type. Please upload a .docx or .doc file', 'error')
         return redirect(url_for('index'))
 
     # Save file

@@ -2,6 +2,7 @@
 
 # Core Document Processing (REQUIRED)
 python-docx==1.1.0
+lxml>=4.9.0
 
 # PDF Conversion (REQUIRED - requires Microsoft Word)
 docx2pdf==0.1.8
