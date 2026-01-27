@@ -618,26 +618,56 @@ This certification is provided by Park Evaluation Services in the regular course
 
         try:
             # Try using docx2pdf (works on Windows with Word installed)
-            from docx2pdf import convert
-            convert(str(docx_path), str(pdf_path))
-            print(f"Converted to PDF using docx2pdf: {pdf_path}")
-            return True
+            # Initialize COM for the current thread
+            try:
+                import pythoncom
+                pythoncom.CoInitialize()
+                com_initialized = True
+            except:
+                com_initialized = False
+
+            try:
+                from docx2pdf import convert
+                convert(str(docx_path), str(pdf_path))
+                print(f"Converted to PDF using docx2pdf: {pdf_path}")
+                return True
+            finally:
+                # Uninitialize COM
+                if com_initialized:
+                    try:
+                        pythoncom.CoUninitialize()
+                    except:
+                        pass
+
         except Exception as e:
             print(f"docx2pdf conversion failed: {e}")
 
             # Fallback: Try using win32com (Windows only)
             try:
+                import pythoncom
                 import win32com.client
-                word = win32com.client.Dispatch("Word.Application")
-                word.Visible = False
 
-                doc = word.Documents.Open(str(Path(docx_path).absolute()))
-                doc.SaveAs(str(Path(pdf_path).absolute()), FileFormat=17)  # 17 = PDF
-                doc.Close()
-                word.Quit()
+                # Initialize COM for the current thread
+                pythoncom.CoInitialize()
 
-                print(f"Converted to PDF using Word COM: {pdf_path}")
-                return True
+                try:
+                    word = win32com.client.Dispatch("Word.Application")
+                    word.Visible = False
+
+                    doc = word.Documents.Open(str(Path(docx_path).absolute()))
+                    doc.SaveAs(str(Path(pdf_path).absolute()), FileFormat=17)  # 17 = PDF
+                    doc.Close()
+                    word.Quit()
+
+                    print(f"Converted to PDF using Word COM: {pdf_path}")
+                    return True
+                finally:
+                    # Uninitialize COM
+                    try:
+                        pythoncom.CoUninitialize()
+                    except:
+                        pass
+
             except Exception as e2:
                 print(f"Word COM conversion also failed: {e2}")
 
