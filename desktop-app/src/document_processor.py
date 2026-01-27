@@ -250,11 +250,16 @@ class DocumentProcessor:
             # Add horizontal line after header using border
             line_para = header.add_paragraph()
             pPr = line_para._element.get_or_add_pPr()
+            # Remove paragraph spacing
+            spacing = OxmlElement('w:spacing')
+            spacing.set(qn('w:before'), '0')
+            spacing.set(qn('w:after'), '0')
+            pPr.append(spacing)
             pBdr = OxmlElement('w:pBdr')
             bottom = OxmlElement('w:bottom')
             bottom.set(qn('w:val'), 'single')
             bottom.set(qn('w:sz'), '6')
-            bottom.set(qn('w:space'), '1')
+            bottom.set(qn('w:space'), '0')
             bottom.set(qn('w:color'), '000000')
             pBdr.append(bottom)
             pPr.append(pBdr)
@@ -270,11 +275,16 @@ class DocumentProcessor:
             # Add horizontal line before footer
             line_para = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
             pPr = line_para._element.get_or_add_pPr()
+            # Remove paragraph spacing
+            spacing = OxmlElement('w:spacing')
+            spacing.set(qn('w:before'), '0')
+            spacing.set(qn('w:after'), '0')
+            pPr.append(spacing)
             pBdr = OxmlElement('w:pBdr')
             top = OxmlElement('w:top')
             top.set(qn('w:val'), 'single')
             top.set(qn('w:sz'), '6')
-            top.set(qn('w:space'), '1')
+            top.set(qn('w:space'), '0')
             top.set(qn('w:color'), '000000')
             pBdr.append(top)
             pPr.append(pBdr)
@@ -282,12 +292,35 @@ class DocumentProcessor:
             # Add "CERTIFIED TRANSLATION" (centered, all caps)
             cert_para = footer.add_paragraph("CERTIFIED TRANSLATION")
             cert_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            # Remove paragraph spacing
+            cert_para.paragraph_format.space_before = Pt(0)
+            cert_para.paragraph_format.space_after = Pt(0)
             cert_para.runs[0].font.bold = True
             cert_para.runs[0].font.size = Pt(12)
 
-            # Add footer info table (3 columns)
+            # Add footer info table (3 columns) - span full width like header
             footer_table = footer.add_table(1, 3, Inches(6.5))
             footer_table.autofit = False
+            footer_table.allow_autofit = False
+
+            # Set table to full width with no spacing
+            tbl = footer_table._element
+            tblPr = tbl.tblPr
+            if tblPr is None:
+                tblPr = OxmlElement('w:tblPr')
+                tbl.insert(0, tblPr)
+
+            # Set table width to 100% (5000 = 100% in Word's measurement)
+            tblW = OxmlElement('w:tblW')
+            tblW.set(qn('w:w'), '5000')
+            tblW.set(qn('w:type'), 'pct')
+            tblPr.append(tblW)
+
+            # Remove table cell spacing
+            tblCellSpacing = OxmlElement('w:tblCellSpacing')
+            tblCellSpacing.set(qn('w:w'), '0')
+            tblCellSpacing.set(qn('w:type'), 'dxa')
+            tblPr.append(tblCellSpacing)
 
             # Left - Case number
             left_cell = footer_table.rows[0].cells[0]
@@ -345,14 +378,14 @@ class DocumentProcessor:
         run.font.size = Pt(9)
 
     def _add_num_pages(self, paragraph):
-        """Add NUMPAGES field to paragraph for total page count in document"""
+        """Add SECTIONPAGES field to count only pages in the current section (translation, not certificates)"""
         run = paragraph.add_run()
         fldChar1 = OxmlElement('w:fldChar')
         fldChar1.set(qn('w:fldCharType'), 'begin')
 
         instrText = OxmlElement('w:instrText')
         instrText.set(qn('xml:space'), 'preserve')
-        instrText.text = 'NUMPAGES'
+        instrText.text = 'SECTIONPAGES'
 
         fldChar2 = OxmlElement('w:fldChar')
         fldChar2.set(qn('w:fldCharType'), 'end')
@@ -627,6 +660,7 @@ This certification is provided by Park Evaluation Services in the regular course
     def combine_documents(self, doc_paths, output_path):
         """Combine multiple Word documents into one using safe section-based approach"""
         from io import BytesIO
+        import zipfile
         from lxml import etree
 
         # Start with the first document (translation with header/footer)
@@ -660,48 +694,90 @@ This certification is provided by Park Evaluation Services in the regular course
                 # Copy paragraph formatting
                 if paragraph.runs:
                     for run in paragraph.runs:
-                        # Check if run contains an image
+                        # Check if run contains an image (drawing or picture)
                         has_image = False
-                        for child in run._element:
-                            if child.tag.endswith('drawing') or child.tag.endswith('pict'):
-                                has_image = True
-                                # Extract and re-add the image properly
+
+                        # Check for drawing elements (modern Word images)
+                        drawings = run._element.findall('.//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}drawing', run._element.nsmap if hasattr(run._element, 'nsmap') else None)
+
+                        if not drawings:
+                            # Also check without namespace for older formats
+                            for child in run._element:
+                                if 'drawing' in child.tag or 'pict' in child.tag:
+                                    drawings = [child]
+                                    break
+
+                        if drawings:
+                            has_image = True
+                            # Try to extract and copy the image
+                            for drawing in drawings:
                                 try:
-                                    # Get the image relationship ID
-                                    blip = child.xpath('.//a:blip', namespaces={
-                                        'a': 'http://schemas.openxmlformats.org/drawingml/2006/main'
-                                    })
+                                    # Find the blip element that contains the image relationship ID
+                                    # Try multiple ways to find it
+                                    blip = None
 
-                                    if blip:
-                                        rId = blip[0].get('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed')
+                                    # Method 1: Use find with full namespace
+                                    ns = {'a': 'http://schemas.openxmlformats.org/drawingml/2006/main',
+                                          'r': 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'}
+                                    blip = drawing.find('.//a:blip', ns)
 
-                                        # Get the image part from source document
-                                        image_part = sub_doc.part.related_parts[rId]
-                                        image_bytes = image_part.blob
+                                    # Method 2: Search all descendants
+                                    if blip is None:
+                                        for elem in drawing.iter():
+                                            if 'blip' in elem.tag.lower():
+                                                blip = elem
+                                                break
 
-                                        # Get the image size from the drawing element
-                                        extent = child.xpath('.//wp:extent', namespaces={
-                                            'wp': 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing'
-                                        })
+                                    if blip is not None:
+                                        # Get the relationship ID
+                                        rId = blip.get('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed')
+                                        if not rId:
+                                            # Try without namespace
+                                            rId = blip.get('embed')
 
-                                        if extent and len(extent) > 0:
-                                            # Convert EMU to inches (1 inch = 914400 EMUs)
-                                            cx = int(extent[0].get('cx'))
-                                            width_inches = cx / 914400.0
+                                        if rId and rId in sub_doc.part.related_parts:
+                                            # Get the image part
+                                            image_part = sub_doc.part.related_parts[rId]
+                                            image_bytes = image_part.blob
+
+                                            # Try to get image dimensions from the extent element
+                                            extent = drawing.find('.//wp:extent', {'wp': 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing'})
+                                            if extent is None:
+                                                # Try searching all descendants
+                                                for elem in drawing.iter():
+                                                    if 'extent' in elem.tag.lower():
+                                                        extent = elem
+                                                        break
 
                                             # Add the image to the new paragraph
                                             new_run = new_para.add_run()
-                                            new_run.add_picture(BytesIO(image_bytes), width=Inches(width_inches))
+
+                                            if extent is not None and extent.get('cx'):
+                                                # Convert EMU to inches (1 inch = 914400 EMUs)
+                                                try:
+                                                    cx = int(extent.get('cx'))
+                                                    width_inches = cx / 914400.0
+                                                    new_run.add_picture(BytesIO(image_bytes), width=Inches(width_inches))
+                                                except:
+                                                    # Fallback to default size
+                                                    new_run.add_picture(BytesIO(image_bytes))
+                                            else:
+                                                # No size info, use default
+                                                new_run.add_picture(BytesIO(image_bytes))
+
+                                            print(f"Successfully copied image from certificate")
                                         else:
-                                            # Fallback: add with default size
-                                            new_run = new_para.add_run()
-                                            new_run.add_picture(BytesIO(image_bytes))
+                                            print(f"Warning: Could not find image relationship {rId}")
+                                            new_run = new_para.add_run("[Image not found]")
+                                    else:
+                                        print(f"Warning: Could not find blip element in drawing")
+                                        new_run = new_para.add_run("[Image]")
 
                                 except Exception as e:
                                     print(f"Warning: Could not copy image: {e}")
-                                    # Add placeholder text
-                                    new_run = new_para.add_run("[Image]")
-                                break
+                                    import traceback
+                                    traceback.print_exc()
+                                    new_run = new_para.add_run("[Image error]")
 
                         # If no image, copy text and formatting
                         if not has_image:
