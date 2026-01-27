@@ -24,12 +24,12 @@
                     <div class="upload-icon">📄</div>
                     <p class="upload-text" id="uploadText">
                         <strong>Click to browse</strong> or drag and drop<br>
-                        <span style="font-size: 0.9rem; color: #718096;">Word document (.docx) - Max 50 MB</span>
+                        <span style="font-size: 0.9rem; color: #718096;">Word document (.docx or .doc) - Max 50 MB</span>
                     </p>
                     <p class="file-selected" id="fileSelected" style="display:none;">
                         <strong>Selected:</strong> <span id="fileName"></span>
                     </p>
-                    <input type="file" name="document" id="documentInput" accept=".docx" required>
+                    <input type="file" name="document" id="documentInput" accept=".docx,.doc" required>
                 </div>
                 <button type="submit" class="btn btn-primary btn-large" id="uploadBtn" style="display:none; margin-top: 1rem;">
                     📤 Upload File
@@ -96,7 +96,7 @@
     <div class="card info-card">
         <h3>How It Works</h3>
         <ol class="instructions">
-            <li><strong>Upload</strong> your translated Word document (.docx)</li>
+            <li><strong>Upload</strong> your translated Word document (.docx or .doc)</li>
             <li><strong>Enter</strong> case information (case number, languages, translator)</li>
             <li><strong>Click</strong> "Process Translation" to generate certified PDF</li>
             <li><strong>Download</strong> the PDF and upload to Plunet</li>
@@ -128,8 +128,8 @@ function handleFileSelect(input) {
         }
 
         // Check file extension
-        if (!fileName.toLowerCase().endsWith('.docx')) {
-            alert('Please select a .docx file.');
+        if (!fileName.toLowerCase().endsWith('.docx') && !fileName.toLowerCase().endsWith('.doc')) {
+            alert('Please select a .docx or .doc file.');
             input.value = '';
             return;
         }

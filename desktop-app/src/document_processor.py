@@ -25,6 +25,46 @@ class DocumentProcessor:
         self.assets_dir = Path(__file__).parent.parent / 'assets'
         self.assets_dir.mkdir(parents=True, exist_ok=True)
 
+    def convert_doc_to_docx(self, doc_path):
+        """Convert .doc file to .docx using Word COM"""
+        try:
+            import pythoncom
+            import win32com.client
+
+            # Initialize COM
+            pythoncom.CoInitialize()
+
+            try:
+                # Create output path
+                docx_path = str(doc_path).replace('.doc', '.docx')
+
+                # Open Word
+                word = win32com.client.Dispatch("Word.Application")
+                word.Visible = False
+
+                # Open the .doc file
+                doc = word.Documents.Open(str(Path(doc_path).absolute()))
+
+                # Save as .docx (FileFormat 16 = .docx)
+                doc.SaveAs2(str(Path(docx_path).absolute()), FileFormat=16)
+                doc.Close()
+                word.Quit()
+
+                print(f"Converted .doc to .docx: {docx_path}")
+                return docx_path
+
+            finally:
+                try:
+                    pythoncom.CoUninitialize()
+                except:
+                    pass
+
+        except Exception as e:
+            print(f"Error converting .doc to .docx: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+
     def process_translation(self, input_file, output_file, metadata):
         """
         Process translation document
@@ -50,6 +90,17 @@ class DocumentProcessor:
             print(f"Input: {input_file}")
             print(f"Output: {output_file}")
             print(f"Metadata: {metadata}")
+
+            # Convert .doc to .docx if needed
+            input_path = Path(input_file)
+            if input_path.suffix.lower() == '.doc':
+                print("Detected .doc file, converting to .docx...")
+                converted_path = self.convert_doc_to_docx(input_file)
+                if converted_path:
+                    input_file = converted_path
+                else:
+                    print("Error: Failed to convert .doc to .docx")
+                    return False
 
             # Create temporary directory for processing
             with tempfile.TemporaryDirectory() as temp_dir:
@@ -107,13 +158,33 @@ class DocumentProcessor:
             for paragraph in header.paragraphs:
                 paragraph.clear()
 
-            # Create header table (2 columns)
+            # Create header table (2 columns) - span full width
             header_table = header.add_table(1, 2, Inches(6.5))
             header_table.autofit = False
+            header_table.allow_autofit = False
 
-            # Set column widths
-            header_table.rows[0].cells[0].width = Inches(3.0)
-            header_table.rows[0].cells[1].width = Inches(3.5)
+            # Set table to full width with no spacing
+            tbl = header_table._element
+            tblPr = tbl.tblPr
+            if tblPr is None:
+                tblPr = OxmlElement('w:tblPr')
+                tbl.insert(0, tblPr)
+
+            # Set table width to 100% (5000 = 100% in Word's measurement)
+            tblW = OxmlElement('w:tblW')
+            tblW.set(qn('w:w'), '5000')
+            tblW.set(qn('w:type'), 'pct')
+            tblPr.append(tblW)
+
+            # Remove table cell spacing
+            tblCellSpacing = OxmlElement('w:tblCellSpacing')
+            tblCellSpacing.set(qn('w:w'), '0')
+            tblCellSpacing.set(qn('w:type'), 'dxa')
+            tblPr.append(tblCellSpacing)
+
+            # Set column widths (proportional)
+            header_table.rows[0].cells[0].width = Inches(2.75)
+            header_table.rows[0].cells[1].width = Inches(3.75)
 
             # Left cell - Logo
             left_cell = header_table.rows[0].cells[0]
@@ -274,14 +345,14 @@ class DocumentProcessor:
         run.font.size = Pt(9)
 
     def _add_num_pages(self, paragraph):
-        """Add SECTIONPAGES field to paragraph for page count in current section (excludes certificates)"""
+        """Add NUMPAGES field to paragraph for total page count in document"""
         run = paragraph.add_run()
         fldChar1 = OxmlElement('w:fldChar')
         fldChar1.set(qn('w:fldCharType'), 'begin')
 
         instrText = OxmlElement('w:instrText')
         instrText.set(qn('xml:space'), 'preserve')
-        instrText.text = 'SECTIONPAGES'
+        instrText.text = 'NUMPAGES'
 
         fldChar2 = OxmlElement('w:fldChar')
         fldChar2.set(qn('w:fldCharType'), 'end')
@@ -296,8 +367,11 @@ class DocumentProcessor:
 
         doc = Document()
 
-        # Configure section - no header/footer
+        # Configure section - no header/footer, Portrait orientation, Letter size
         section = doc.sections[0]
+        section.page_height = Inches(11)  # Letter height
+        section.page_width = Inches(8.5)  # Letter width
+        section.orientation = 0  # 0 = Portrait, 1 = Landscape
         section.header.is_linked_to_previous = False
         section.footer.is_linked_to_previous = False
 
@@ -424,8 +498,11 @@ Case Number: Park Case #{metadata['case_number']}
 
         doc = Document()
 
-        # Configure section - no header/footer
+        # Configure section - no header/footer, Portrait orientation, Letter size
         section = doc.sections[0]
+        section.page_height = Inches(11)  # Letter height
+        section.page_width = Inches(8.5)  # Letter width
+        section.orientation = 0  # 0 = Portrait, 1 = Landscape
         section.header.is_linked_to_previous = False
         section.footer.is_linked_to_previous = False
 
@@ -549,6 +626,8 @@ This certification is provided by Park Evaluation Services in the regular course
 
     def combine_documents(self, doc_paths, output_path):
         """Combine multiple Word documents into one using safe section-based approach"""
+        from io import BytesIO
+        from lxml import etree
 
         # Start with the first document (translation with header/footer)
         combined = Document(doc_paths[0])
@@ -586,9 +665,42 @@ This certification is provided by Park Evaluation Services in the regular course
                         for child in run._element:
                             if child.tag.endswith('drawing') or child.tag.endswith('pict'):
                                 has_image = True
-                                # Copy the entire XML element to preserve the image
-                                new_run = new_para.add_run()
-                                new_run._element.append(child)
+                                # Extract and re-add the image properly
+                                try:
+                                    # Get the image relationship ID
+                                    blip = child.xpath('.//a:blip', namespaces={
+                                        'a': 'http://schemas.openxmlformats.org/drawingml/2006/main'
+                                    })
+
+                                    if blip:
+                                        rId = blip[0].get('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed')
+
+                                        # Get the image part from source document
+                                        image_part = sub_doc.part.related_parts[rId]
+                                        image_bytes = image_part.blob
+
+                                        # Get the image size from the drawing element
+                                        extent = child.xpath('.//wp:extent', namespaces={
+                                            'wp': 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing'
+                                        })
+
+                                        if extent and len(extent) > 0:
+                                            # Convert EMU to inches (1 inch = 914400 EMUs)
+                                            cx = int(extent[0].get('cx'))
+                                            width_inches = cx / 914400.0
+
+                                            # Add the image to the new paragraph
+                                            new_run = new_para.add_run()
+                                            new_run.add_picture(BytesIO(image_bytes), width=Inches(width_inches))
+                                        else:
+                                            # Fallback: add with default size
+                                            new_run = new_para.add_run()
+                                            new_run.add_picture(BytesIO(image_bytes))
+
+                                except Exception as e:
+                                    print(f"Warning: Could not copy image: {e}")
+                                    # Add placeholder text
+                                    new_run = new_para.add_run("[Image]")
                                 break
 
                         # If no image, copy text and formatting

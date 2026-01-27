@@ -263,7 +263,7 @@ class TranslationProcessorApp:
         file_path = filedialog.askopenfilename(
             title="Select Word Document",
             filetypes=[
-                ("Word Documents", "*.docx"),
+                ("Word Documents", "*.docx;*.doc"),
                 ("All Files", "*.*")
             ]
         )
@@ -280,8 +280,8 @@ class TranslationProcessorApp:
             messagebox.showerror("Error", "File does not exist")
             return
 
-        if path.suffix.lower() != '.docx':
-            messagebox.showerror("Error", "Please select a Word document (.docx)")
+        if path.suffix.lower() not in ['.docx', '.doc']:
+            messagebox.showerror("Error", "Please select a Word document (.docx or .doc)")
             return
 
         self.selected_file = path
