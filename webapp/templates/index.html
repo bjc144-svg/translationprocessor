@@ -12,22 +12,30 @@
     <!-- File Upload Section -->
     <div class="card">
         <h3>1. Upload Document</h3>
-        <form action="{{ url_for('upload_file') }}" method="post" enctype="multipart/form-data" id="uploadForm">
-            <div class="upload-area" id="uploadArea">
-                <div class="upload-icon">📄</div>
-                <p class="upload-text">
-                    {% if session.get('original_filename') %}
-                        <strong>Selected:</strong> {{ session.get('original_filename') }}
-                    {% else %}
-                        Click to browse or drag and drop a Word document (.docx)
-                    {% endif %}
-                </p>
-                <input type="file" name="document" id="documentInput" accept=".docx" required onchange="handleFileSelect(this)">
-                <button type="submit" class="btn btn-primary" id="uploadBtn" {% if not session.get('uploaded_file') %}style="display:none"{% endif %}>
-                    Upload File
-                </button>
+        {% if session.get('uploaded_file') %}
+            <div class="upload-success">
+                <div class="success-icon">✓</div>
+                <p><strong>File Uploaded:</strong> {{ session.get('original_filename') }}</p>
+                <button type="button" class="btn btn-secondary btn-small" onclick="clearForm()">Upload Different File</button>
             </div>
-        </form>
+        {% else %}
+            <form action="{{ url_for('upload_file') }}" method="post" enctype="multipart/form-data" id="uploadForm">
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📄</div>
+                    <p class="upload-text" id="uploadText">
+                        <strong>Click to browse</strong> or drag and drop<br>
+                        <span style="font-size: 0.9rem; color: #718096;">Word document (.docx) - Max 50 MB</span>
+                    </p>
+                    <p class="file-selected" id="fileSelected" style="display:none;">
+                        <strong>Selected:</strong> <span id="fileName"></span>
+                    </p>
+                    <input type="file" name="document" id="documentInput" accept=".docx" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-large" id="uploadBtn" style="display:none; margin-top: 1rem;">
+                    📤 Upload File
+                </button>
+            </form>
+        {% endif %}
     </div>
 
     <!-- Case Information Section -->
@@ -107,6 +115,29 @@
 <script>
 function handleFileSelect(input) {
     if (input.files && input.files[0]) {
+        const file = input.files[0];
+        const fileName = file.name;
+        const fileSize = file.size;
+        const maxSize = 50 * 1024 * 1024; // 50 MB
+
+        // Check file size
+        if (fileSize > maxSize) {
+            alert('File is too large. Maximum size is 50 MB.');
+            input.value = '';
+            return;
+        }
+
+        // Check file extension
+        if (!fileName.toLowerCase().endsWith('.docx')) {
+            alert('Please select a .docx file.');
+            input.value = '';
+            return;
+        }
+
+        // Update UI to show selected file
+        document.getElementById('uploadText').style.display = 'none';
+        document.getElementById('fileSelected').style.display = 'block';
+        document.getElementById('fileName').textContent = fileName;
         document.getElementById('uploadBtn').style.display = 'block';
     }
 }
@@ -124,46 +155,58 @@ function clearForm() {
     }
 }
 
-// Drag and drop functionality
+// Initialize drag and drop only if elements exist
 const uploadArea = document.getElementById('uploadArea');
 const fileInput = document.getElementById('documentInput');
 
-['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-    uploadArea.addEventListener(eventName, preventDefaults, false);
-});
+if (uploadArea && fileInput) {
+    // File input change handler
+    fileInput.addEventListener('change', function() {
+        handleFileSelect(this);
+    });
 
-function preventDefaults(e) {
-    e.preventDefault();
-    e.stopPropagation();
+    // Prevent default drag behaviors
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        uploadArea.addEventListener(eventName, preventDefaults, false);
+        document.body.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    // Highlight drop area when dragging over it
+    ['dragenter', 'dragover'].forEach(eventName => {
+        uploadArea.addEventListener(eventName, () => {
+            uploadArea.classList.add('drag-over');
+        }, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        uploadArea.addEventListener(eventName, () => {
+            uploadArea.classList.remove('drag-over');
+        }, false);
+    });
+
+    // Handle dropped files
+    uploadArea.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+
+        if (files.length > 0) {
+            fileInput.files = files;
+            handleFileSelect(fileInput);
+        }
+    }, false);
+
+    // Click to browse
+    uploadArea.addEventListener('click', (e) => {
+        // Only trigger file input if not clicking on a button
+        if (e.target.tagName !== 'BUTTON') {
+            fileInput.click();
+        }
+    });
 }
-
-['dragenter', 'dragover'].forEach(eventName => {
-    uploadArea.addEventListener(eventName, () => {
-        uploadArea.classList.add('drag-over');
-    }, false);
-});
-
-['dragleave', 'drop'].forEach(eventName => {
-    uploadArea.addEventListener(eventName, () => {
-        uploadArea.classList.remove('drag-over');
-    }, false);
-});
-
-uploadArea.addEventListener('drop', (e) => {
-    const dt = e.dataTransfer;
-    const files = dt.files;
-
-    if (files.length > 0) {
-        fileInput.files = files;
-        handleFileSelect(fileInput);
-    }
-}, false);
-
-// Click to browse
-uploadArea.addEventListener('click', (e) => {
-    if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT') {
-        fileInput.click();
-    }
-});
 </script>
 {% endblock %}
