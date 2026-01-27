@@ -115,17 +115,47 @@ class DocumentProcessor:
             header_table.rows[0].cells[0].width = Inches(3.0)
             header_table.rows[0].cells[1].width = Inches(3.5)
 
-            # Left cell - Logo placeholder (will be replaced with actual logo later)
+            # Left cell - Logo
             left_cell = header_table.rows[0].cells[0]
             left_para = left_cell.paragraphs[0]
-            left_para.text = "PARK EVALUATION SERVICES"
             left_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
-            left_para.runs[0].font.bold = True
-            left_para.runs[0].font.size = Pt(10)
+
+            # Try to add logo image
+            logo_path = self.assets_dir / 'park_logo.png'
+            logo_added = False
+
+            if logo_path.exists():
+                try:
+                    run = left_para.add_run()
+                    run.add_picture(str(logo_path), height=Inches(0.5))
+                    logo_added = True
+                    print(f"Successfully added Park logo from: {logo_path}")
+                except Exception as e:
+                    print(f"Error adding logo image: {e}")
+                    import traceback
+                    traceback.print_exc()
+
+            # If logo couldn't be loaded, use text fallback
+            if not logo_added:
+                left_para.text = "PARK EVALUATION SERVICES"
+                left_para.runs[0].font.bold = True
+                left_para.runs[0].font.size = Pt(10)
+                print(f"Warning: Park logo file not found at: {logo_path}")
 
             # Right cell - Contact info
             right_cell = header_table.rows[0].cells[1]
             right_cell.vertical_alignment = 1  # Center vertically
+
+            # Remove cell margins for proper right alignment
+            tc = right_cell._element
+            tcPr = tc.get_or_add_tcPr()
+            tcMar = OxmlElement('w:tcMar')
+            for margin_name in ['top', 'left', 'bottom', 'right']:
+                node = OxmlElement(f'w:{margin_name}')
+                node.set(qn('w:w'), '0')
+                node.set(qn('w:type'), 'dxa')
+                tcMar.append(node)
+            tcPr.append(tcMar)
 
             # Add contact info (right-aligned)
             contact_lines = [
@@ -140,6 +170,9 @@ class DocumentProcessor:
                 para = right_cell.paragraphs[i] if i == 0 else right_cell.paragraphs[-1]
                 para.text = line
                 para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                # Remove paragraph spacing for tight alignment
+                para.paragraph_format.space_before = Pt(0)
+                para.paragraph_format.space_after = Pt(0)
                 run = para.runs[0]
                 run.font.size = Pt(10)
 
@@ -241,14 +274,14 @@ class DocumentProcessor:
         run.font.size = Pt(9)
 
     def _add_num_pages(self, paragraph):
-        """Add NUMPAGES field to paragraph for total page count"""
+        """Add SECTIONPAGES field to paragraph for page count in current section (excludes certificates)"""
         run = paragraph.add_run()
         fldChar1 = OxmlElement('w:fldChar')
         fldChar1.set(qn('w:fldCharType'), 'begin')
 
         instrText = OxmlElement('w:instrText')
         instrText.set(qn('xml:space'), 'preserve')
-        instrText.text = 'NUMPAGES'
+        instrText.text = 'SECTIONPAGES'
 
         fldChar2 = OxmlElement('w:fldChar')
         fldChar2.set(qn('w:fldCharType'), 'end')
@@ -274,12 +307,31 @@ class DocumentProcessor:
         for paragraph in section.footer.paragraphs:
             paragraph.clear()
 
-        # Add logo placeholder
+        # Add logo
         logo_para = doc.add_paragraph()
         logo_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run = logo_para.add_run("[PARK EVALUATION SERVICES LOGO]")
-        run.font.size = Pt(14)
-        run.font.bold = True
+
+        # Try to add logo image
+        logo_path = self.assets_dir / 'park_logo.png'
+        logo_added = False
+
+        if logo_path.exists():
+            try:
+                run = logo_para.add_run()
+                run.add_picture(str(logo_path), height=Inches(0.8))
+                logo_added = True
+                print(f"Successfully added Park logo to translator certificate from: {logo_path}")
+            except Exception as e:
+                print(f"Error adding logo image to translator certificate: {e}")
+                import traceback
+                traceback.print_exc()
+
+        # If logo couldn't be loaded, use text fallback
+        if not logo_added:
+            run = logo_para.add_run("PARK EVALUATION SERVICES")
+            run.font.size = Pt(14)
+            run.font.bold = True
+            print(f"Warning: Park logo file not found at: {logo_path}")
 
         doc.add_paragraph()  # Spacing
 
@@ -383,12 +435,31 @@ Case Number: Park Case #{metadata['case_number']}
         for paragraph in section.footer.paragraphs:
             paragraph.clear()
 
-        # Add logo placeholder
+        # Add logo
         logo_para = doc.add_paragraph()
         logo_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run = logo_para.add_run("[PARK EVALUATION SERVICES LOGO]")
-        run.font.size = Pt(14)
-        run.font.bold = True
+
+        # Try to add logo image
+        logo_path = self.assets_dir / 'park_logo.png'
+        logo_added = False
+
+        if logo_path.exists():
+            try:
+                run = logo_para.add_run()
+                run.add_picture(str(logo_path), height=Inches(0.8))
+                logo_added = True
+                print(f"Successfully added Park logo to Park certificate from: {logo_path}")
+            except Exception as e:
+                print(f"Error adding logo image to Park certificate: {e}")
+                import traceback
+                traceback.print_exc()
+
+        # If logo couldn't be loaded, use text fallback
+        if not logo_added:
+            run = logo_para.add_run("PARK EVALUATION SERVICES")
+            run.font.size = Pt(14)
+            run.font.bold = True
+            print(f"Warning: Park logo file not found at: {logo_path}")
 
         doc.add_paragraph()  # Spacing
 
@@ -503,23 +574,33 @@ This certification is provided by Park Evaluation Services in the regular course
             # Copy all paragraphs from sub_doc
             for paragraph in sub_doc.paragraphs:
                 # Create a new paragraph in the combined document
-                new_para = combined.add_paragraph(paragraph.text)
+                new_para = combined.add_paragraph()
                 new_para.alignment = paragraph.alignment
                 new_para.style = paragraph.style
 
                 # Copy paragraph formatting
                 if paragraph.runs:
-                    # Clear the default run
-                    new_para.clear()
                     for run in paragraph.runs:
-                        new_run = new_para.add_run(run.text)
-                        new_run.bold = run.bold
-                        new_run.italic = run.italic
-                        new_run.underline = run.underline
-                        if run.font.size:
-                            new_run.font.size = run.font.size
-                        if run.font.name:
-                            new_run.font.name = run.font.name
+                        # Check if run contains an image
+                        has_image = False
+                        for child in run._element:
+                            if child.tag.endswith('drawing') or child.tag.endswith('pict'):
+                                has_image = True
+                                # Copy the entire XML element to preserve the image
+                                new_run = new_para.add_run()
+                                new_run._element.append(child)
+                                break
+
+                        # If no image, copy text and formatting
+                        if not has_image:
+                            new_run = new_para.add_run(run.text)
+                            new_run.bold = run.bold
+                            new_run.italic = run.italic
+                            new_run.underline = run.underline
+                            if run.font.size:
+                                new_run.font.size = run.font.size
+                            if run.font.name:
+                                new_run.font.name = run.font.name
 
             # Copy tables
             for table in sub_doc.tables:
