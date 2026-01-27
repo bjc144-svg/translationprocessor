@@ -120,6 +120,7 @@ def process_document():
         return redirect(url_for('index'))
 
     # Get form data
+    division = request.form.get('division', 'Park').strip()
     case_number = request.form.get('case_number', '').strip()
     source_language = request.form.get('source_language', '').strip()
     target_language = request.form.get('target_language', '').strip()
@@ -128,6 +129,8 @@ def process_document():
 
     # Validate inputs
     errors = []
+    if not division:
+        errors.append('Division is required')
     if not case_number:
         errors.append('Case number is required')
     if not source_language:
@@ -153,6 +156,7 @@ def process_document():
 
     # Prepare metadata
     metadata = {
+        'division': division,
         'case_number': case_number,
         'source_language': source_language,
         'target_language': target_language,
