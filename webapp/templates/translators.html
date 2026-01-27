@@ -1,0 +1,94 @@
+{% extends "layout.html" %}
+
+{% block title %}Manage Translators{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Translator Management</h2>
+    <p>Add, view, and manage translators and their signatures</p>
+</div>
+
+<div class="translator-container">
+    <!-- Add Translator Form -->
+    <div class="card">
+        <h3>Add New Translator</h3>
+        <form action="{{ url_for('add_translator') }}" method="post" enctype="multipart/form-data" id="addTranslatorForm">
+            <div class="form-group">
+                <label for="name">Translator Name: <span class="required">*</span></label>
+                <input type="text" id="name" name="name" required placeholder="e.g., John Smith">
+            </div>
+
+            <div class="form-group">
+                <label for="language_pairs">Language Pairs: <span class="required">*</span></label>
+                <textarea id="language_pairs" name="language_pairs" rows="5" required placeholder="Enter one language pair per line, e.g.:&#10;Spanish > English&#10;French > English&#10;German > English"></textarea>
+                <small>One per line, format: "Source > Target"</small>
+            </div>
+
+            <div class="form-group">
+                <label for="signature">Translator Signature (PNG/JPG):</label>
+                <input type="file" id="signature" name="signature" accept=".png,.jpg,.jpeg,.gif">
+                <small>Optional: Upload translator's signature image</small>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Add Translator</button>
+        </form>
+    </div>
+
+    <!-- Translators List -->
+    <div class="card">
+        <h3>Current Translators ({{ translators|length }})</h3>
+
+        {% if translators %}
+            <div class="translators-list">
+                {% for translator in translators %}
+                    <div class="translator-item">
+                        <div class="translator-info">
+                            <h4>{{ translator.name }}</h4>
+                            <div class="language-pairs">
+                                <strong>Language Pairs:</strong>
+                                <ul>
+                                    {% for pair in translator.language_pairs %}
+                                        <li>{{ pair }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            <div class="signature-status">
+                                <strong>Signature:</strong>
+                                {% if translator.signature_path %}
+                                    <span class="badge badge-success">✓ Uploaded</span>
+                                {% else %}
+                                    <span class="badge badge-warning">No signature</span>
+                                {% endif %}
+                            </div>
+                            <small class="text-muted">
+                                Added: {{ translator.created_at[:10] if translator.created_at else 'Unknown' }}
+                            </small>
+                        </div>
+                        <div class="translator-actions">
+                            <form action="{{ url_for('delete_translator', name=translator.name) }}" method="post" style="display:inline;" onsubmit="return confirm('Delete translator {{ translator.name }}? This cannot be undone.');">
+                                <button type="submit" class="btn btn-danger btn-small">Delete</button>
+                            </form>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <p>No translators added yet.</p>
+                <p>Use the form above to add your first translator.</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Instructions -->
+    <div class="card info-card">
+        <h3>Tips</h3>
+        <ul class="instructions">
+            <li><strong>Name:</strong> Enter translator's full name as it should appear on certificates</li>
+            <li><strong>Language Pairs:</strong> List all language combinations this translator works with</li>
+            <li><strong>Signature:</strong> Upload a clear signature image (PNG with transparent background recommended)</li>
+            <li><strong>Shared Database:</strong> All translators added here are available to all users on the network</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}
