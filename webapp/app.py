@@ -13,6 +13,7 @@ import secrets
 # Import utilities
 from utils.translator_manager import TranslatorManager
 from utils.document_processor import DocumentProcessor
+from utils.language_manager import LanguageManager
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -39,26 +40,18 @@ app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE
 
 # Initialize managers
 translator_manager = TranslatorManager(data_dir=DATA_FOLDER)
+language_manager = LanguageManager(data_dir=DATA_FOLDER)
 document_processor = DocumentProcessor()
 
 def allowed_file(filename):
     """Check if file extension is allowed"""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def get_common_languages():
-    """Return list of common languages"""
-    return [
-        "English", "Spanish", "French", "German", "Italian",
-        "Portuguese", "Chinese", "Japanese", "Korean", "Arabic",
-        "Russian", "Hindi", "Bengali", "Polish", "Dutch",
-        "Turkish", "Vietnamese", "Thai", "Greek", "Hebrew"
-    ]
-
 @app.route('/')
 def index():
     """Main page - translation processor"""
     translators = translator_manager.get_translator_names()
-    languages = get_common_languages()
+    languages = language_manager.get_languages()
 
     return render_template(
         'index.html',
@@ -209,7 +202,11 @@ def download():
         flash('No processed document available', 'error')
         return redirect(url_for('index'))
 
-    return render_template('download.html', filename=output_file)
+    return render_template(
+        'download.html',
+        filename=output_file,
+        current_date=datetime.now().strftime("%B %d, %Y")
+    )
 
 @app.route('/download/<filename>')
 def download_file(filename):
@@ -233,7 +230,7 @@ def download_file(filename):
 def translators():
     """Translator management page"""
     all_translators = translator_manager.get_all_translators()
-    languages = get_common_languages()
+    languages = language_manager.get_languages()
 
     return render_template(
         'translators.html',
@@ -246,18 +243,13 @@ def add_translator():
     """Add new translator"""
 
     name = request.form.get('name', '').strip()
-    language_pairs = request.form.get('language_pairs', '').strip()
 
     if not name:
         flash('Translator name is required', 'error')
         return redirect(url_for('translators'))
 
-    if not language_pairs:
-        flash('At least one language pair is required', 'error')
-        return redirect(url_for('translators'))
-
-    # Parse language pairs (one per line)
-    pairs = [line.strip() for line in language_pairs.split('\n') if line.strip()]
+    # Language pairs no longer required - default to empty list
+    pairs = []
 
     # Handle signature upload
     signature_path = None
@@ -294,18 +286,13 @@ def update_translator(old_name):
     """Update existing translator"""
 
     new_name = request.form.get('name', '').strip()
-    language_pairs = request.form.get('language_pairs', '').strip()
 
     if not new_name:
         flash('Translator name is required', 'error')
         return redirect(url_for('translators'))
 
-    if not language_pairs:
-        flash('At least one language pair is required', 'error')
-        return redirect(url_for('translators'))
-
-    # Parse language pairs (one per line)
-    pairs = [line.strip() for line in language_pairs.split('\n') if line.strip()]
+    # Language pairs no longer required - default to empty list
+    pairs = []
 
     # Handle signature upload
     signature_path = None
@@ -355,6 +342,36 @@ def api_translators():
     """API endpoint to get translators as JSON"""
     translators = translator_manager.get_all_translators()
     return jsonify(translators)
+
+@app.route('/languages/add', methods=['POST'])
+def add_language():
+    """Add new language"""
+    language = request.form.get('language', '').strip()
+
+    if not language:
+        flash('Language name is required', 'error')
+        return redirect(url_for('translators'))
+
+    success, message = language_manager.add_language(language)
+
+    if success:
+        flash(message, 'success')
+    else:
+        flash(message, 'error')
+
+    return redirect(url_for('translators'))
+
+@app.route('/languages/delete/<language>', methods=['POST'])
+def delete_language(language):
+    """Delete language"""
+    success, message = language_manager.delete_language(language)
+
+    if success:
+        flash(message, 'success')
+    else:
+        flash(message, 'error')
+
+    return redirect(url_for('translators'))
 
 @app.route('/clear', methods=['POST'])
 def clear():

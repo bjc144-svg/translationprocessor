@@ -14,7 +14,7 @@
 
         <div class="file-info">
             <p><strong>Filename:</strong> {{ filename }}</p>
-            <p><strong>Generated:</strong> {{ current_date() }}</p>
+            <p><strong>Generated:</strong> {{ current_date }}</p>
         </div>
 
         <div class="button-group">
@@ -65,11 +65,10 @@
 </div>
 
 <script>
-// Auto-download after 2 seconds
-setTimeout(function() {
-    if (confirm('Ready to download the PDF?')) {
-        window.location.href = "{{ url_for('download_file', filename=filename) }}";
-    }
-}, 2000);
+// Auto-download immediately without dialog
+window.addEventListener('DOMContentLoaded', function() {
+    // Trigger download automatically
+    window.location.href = "{{ url_for('download_file', filename=filename) }}";
+});
 </script>
 {% endblock %}

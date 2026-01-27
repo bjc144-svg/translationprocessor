@@ -97,110 +97,182 @@ class DocumentProcessor:
         # Open document
         doc = Document(input_file)
 
-        # Add header
-        section = doc.sections[0]
-        header = section.header
+        # Apply header/footer to ALL sections
+        for section in doc.sections:
+            # Set up header
+            header = section.header
+            header.is_linked_to_previous = False
 
-        # Clear existing header
-        header.is_linked_to_previous = False
-        for paragraph in header.paragraphs:
-            paragraph.clear()
+            # Clear existing header
+            for paragraph in header.paragraphs:
+                paragraph.clear()
 
-        # Create header table (2 columns)
-        header_table = header.add_table(1, 2, Inches(6.5))
-        header_table.autofit = False
+            # Create header table (2 columns)
+            header_table = header.add_table(1, 2, Inches(6.5))
+            header_table.autofit = False
 
-        # Left cell - Logo placeholder
-        left_cell = header_table.rows[0].cells[0]
-        left_para = left_cell.paragraphs[0]
-        left_para.text = "[LOGO HERE]"
-        left_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            # Set column widths
+            header_table.rows[0].cells[0].width = Inches(3.0)
+            header_table.rows[0].cells[1].width = Inches(3.5)
 
-        # Right cell - Contact info
-        right_cell = header_table.rows[0].cells[1]
-        right_cell.vertical_alignment = 1  # Center vertically
+            # Left cell - Logo placeholder (will be replaced with actual logo later)
+            left_cell = header_table.rows[0].cells[0]
+            left_para = left_cell.paragraphs[0]
+            left_para.text = "PARK EVALUATION SERVICES"
+            left_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            left_para.runs[0].font.bold = True
+            left_para.runs[0].font.size = Pt(10)
 
-        # Add contact info (right-aligned)
-        contact_lines = [
-            "212-581-8877",
-            "eval@parkeval.com",
-            "www.parkeval.com"
-        ]
+            # Right cell - Contact info
+            right_cell = header_table.rows[0].cells[1]
+            right_cell.vertical_alignment = 1  # Center vertically
 
-        for i, line in enumerate(contact_lines):
-            if i > 0:
-                right_cell.add_paragraph()
-            para = right_cell.paragraphs[i] if i == 0 else right_cell.paragraphs[-1]
-            para.text = line
-            para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-            run = para.runs[0]
-            run.font.size = Pt(10)
+            # Add contact info (right-aligned)
+            contact_lines = [
+                "212-581-8877",
+                "eval@parkeval.com",
+                "www.parkeval.com"
+            ]
 
-        # Add horizontal line after header
-        header.add_paragraph("_" * 80)
+            for i, line in enumerate(contact_lines):
+                if i > 0:
+                    right_cell.add_paragraph()
+                para = right_cell.paragraphs[i] if i == 0 else right_cell.paragraphs[-1]
+                para.text = line
+                para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                run = para.runs[0]
+                run.font.size = Pt(10)
 
-        # Add footer
-        footer = section.footer
-        footer.is_linked_to_previous = False
+            # Add horizontal line after header using border
+            line_para = header.add_paragraph()
+            pPr = line_para._element.get_or_add_pPr()
+            pBdr = OxmlElement('w:pBdr')
+            bottom = OxmlElement('w:bottom')
+            bottom.set(qn('w:val'), 'single')
+            bottom.set(qn('w:sz'), '6')
+            bottom.set(qn('w:space'), '1')
+            bottom.set(qn('w:color'), '000000')
+            pBdr.append(bottom)
+            pPr.append(pBdr)
 
-        # Clear existing footer
-        for paragraph in footer.paragraphs:
-            paragraph.clear()
+            # Set up footer
+            footer = section.footer
+            footer.is_linked_to_previous = False
 
-        # Add horizontal line before footer
-        footer_line = footer.paragraphs[0]
-        footer_line.text = "_" * 80
+            # Clear existing footer
+            for paragraph in footer.paragraphs:
+                paragraph.clear()
 
-        # Add "CERTIFIED TRANSLATION" (centered, all caps)
-        cert_para = footer.add_paragraph("CERTIFIED TRANSLATION")
-        cert_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        cert_para.runs[0].font.bold = True
-        cert_para.runs[0].font.size = Pt(12)
+            # Add horizontal line before footer
+            line_para = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
+            pPr = line_para._element.get_or_add_pPr()
+            pBdr = OxmlElement('w:pBdr')
+            top = OxmlElement('w:top')
+            top.set(qn('w:val'), 'single')
+            top.set(qn('w:sz'), '6')
+            top.set(qn('w:space'), '1')
+            top.set(qn('w:color'), '000000')
+            pBdr.append(top)
+            pPr.append(pBdr)
 
-        # Add footer info table (3 columns)
-        footer_table = footer.add_table(1, 3, Inches(6.5))
-        footer_table.autofit = False
+            # Add "CERTIFIED TRANSLATION" (centered, all caps)
+            cert_para = footer.add_paragraph("CERTIFIED TRANSLATION")
+            cert_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            cert_para.runs[0].font.bold = True
+            cert_para.runs[0].font.size = Pt(12)
 
-        # Left - Case number
-        left_cell = footer_table.rows[0].cells[0]
-        left_para = left_cell.paragraphs[0]
-        left_para.text = f"Park Case #{metadata['case_number']}"
-        left_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
-        left_para.runs[0].font.size = Pt(9)
+            # Add footer info table (3 columns)
+            footer_table = footer.add_table(1, 3, Inches(6.5))
+            footer_table.autofit = False
 
-        # Center - Page number (using field code)
-        center_cell = footer_table.rows[0].cells[1]
-        center_para = center_cell.paragraphs[0]
-        center_para.text = "Page "
-        center_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        center_para.runs[0].font.size = Pt(9)
+            # Left - Case number
+            left_cell = footer_table.rows[0].cells[0]
+            left_para = left_cell.paragraphs[0]
+            left_para.text = f"Park Case #{metadata['case_number']}"
+            left_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            left_para.runs[0].font.size = Pt(9)
 
-        # Add page number field
-        # Note: This is a simplified version - actual page numbering requires field codes
-        run = center_para.add_run()
-        run.text = "X of Y"  # Placeholder - proper page numbers need field codes
-        run.font.size = Pt(9)
+            # Center - Page number with field codes
+            center_cell = footer_table.rows[0].cells[1]
+            center_para = center_cell.paragraphs[0]
+            center_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
-        # Right - Language pair
-        right_cell = footer_table.rows[0].cells[2]
-        right_para = right_cell.paragraphs[0]
-        right_para.text = metadata['language_pair']
-        right_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-        right_para.runs[0].font.size = Pt(9)
+            # Add "Page " text
+            run = center_para.add_run("Page ")
+            run.font.size = Pt(9)
+
+            # Add PAGE field (current page number)
+            self._add_page_number(center_para)
+
+            # Add " of " text
+            run = center_para.add_run(" of ")
+            run.font.size = Pt(9)
+
+            # Add NUMPAGES field (total pages)
+            self._add_num_pages(center_para)
+
+            # Right - Language pair
+            right_cell = footer_table.rows[0].cells[2]
+            right_para = right_cell.paragraphs[0]
+            right_para.text = metadata['language_pair']
+            right_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            right_para.runs[0].font.size = Pt(9)
 
         # Save document
         doc.save(output_file)
         print(f"Saved document with header/footer to: {output_file}")
+
+    def _add_page_number(self, paragraph):
+        """Add PAGE field to paragraph for current page number"""
+        run = paragraph.add_run()
+        fldChar1 = OxmlElement('w:fldChar')
+        fldChar1.set(qn('w:fldCharType'), 'begin')
+
+        instrText = OxmlElement('w:instrText')
+        instrText.set(qn('xml:space'), 'preserve')
+        instrText.text = 'PAGE'
+
+        fldChar2 = OxmlElement('w:fldChar')
+        fldChar2.set(qn('w:fldCharType'), 'end')
+
+        run._r.append(fldChar1)
+        run._r.append(instrText)
+        run._r.append(fldChar2)
+        run.font.size = Pt(9)
+
+    def _add_num_pages(self, paragraph):
+        """Add NUMPAGES field to paragraph for total page count"""
+        run = paragraph.add_run()
+        fldChar1 = OxmlElement('w:fldChar')
+        fldChar1.set(qn('w:fldCharType'), 'begin')
+
+        instrText = OxmlElement('w:instrText')
+        instrText.set(qn('xml:space'), 'preserve')
+        instrText.text = 'NUMPAGES'
+
+        fldChar2 = OxmlElement('w:fldChar')
+        fldChar2.set(qn('w:fldCharType'), 'end')
+
+        run._r.append(fldChar1)
+        run._r.append(instrText)
+        run._r.append(fldChar2)
+        run.font.size = Pt(9)
 
     def create_translator_certificate(self, output_file, metadata):
         """Create translator certificate"""
 
         doc = Document()
 
-        # Remove default header/footer
+        # Configure section - no header/footer
         section = doc.sections[0]
         section.header.is_linked_to_previous = False
         section.footer.is_linked_to_previous = False
+
+        # Clear header and footer completely
+        for paragraph in section.header.paragraphs:
+            paragraph.clear()
+        for paragraph in section.footer.paragraphs:
+            paragraph.clear()
 
         # Add logo placeholder
         logo_para = doc.add_paragraph()
@@ -255,15 +327,32 @@ Case Number: Park Case #{metadata['case_number']}
         sig_label.runs[0].font.italic = True
 
         # Add signature image if available
-        if metadata.get('translator_signature') and os.path.exists(metadata['translator_signature']):
-            try:
-                # Insert signature image
-                sig_img_para = doc.add_paragraph()
-                sig_img_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
-                run = sig_img_para.add_run()
-                run.add_picture(metadata['translator_signature'], width=Inches(2))
-            except Exception as e:
-                print(f"Error adding signature image: {e}")
+        sig_added = False
+        if metadata.get('translator_signature'):
+            sig_path = metadata['translator_signature']
+            print(f"Looking for translator signature at: {sig_path}")
+
+            if os.path.exists(sig_path):
+                try:
+                    # Insert signature image ABOVE the line
+                    sig_img_para = doc.paragraphs[-2]  # Get the signature line paragraph
+                    run = sig_img_para.insert_paragraph_before().add_run()
+                    run.add_picture(sig_path, width=Inches(2))
+                    sig_added = True
+                    print(f"Successfully added translator signature from: {sig_path}")
+                except Exception as e:
+                    print(f"Error adding signature image: {e}")
+                    import traceback
+                    traceback.print_exc()
+            else:
+                print(f"Warning: Translator signature file not found: {sig_path}")
+
+        if not sig_added:
+            # Add placeholder text if signature couldn't be loaded
+            sig_placeholder = doc.add_paragraph("[Signature image not available]")
+            sig_placeholder.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            sig_placeholder.runs[0].font.size = Pt(9)
+            sig_placeholder.runs[0].font.italic = True
 
         doc.add_paragraph()  # Spacing
         doc.add_paragraph()  # Spacing
@@ -283,10 +372,16 @@ Case Number: Park Case #{metadata['case_number']}
 
         doc = Document()
 
-        # Remove default header/footer
+        # Configure section - no header/footer
         section = doc.sections[0]
         section.header.is_linked_to_previous = False
         section.footer.is_linked_to_previous = False
+
+        # Clear header and footer completely
+        for paragraph in section.header.paragraphs:
+            paragraph.clear()
+        for paragraph in section.footer.paragraphs:
+            paragraph.clear()
 
         # Add logo placeholder
         logo_para = doc.add_paragraph()
@@ -331,7 +426,7 @@ This certification is provided by Park Evaluation Services in the regular course
 
         doc.add_paragraph()  # Spacing
 
-        # Signature section (Park employee - fixed)
+        # Signature section (Park employee)
         sig_para = doc.add_paragraph("_" * 40)
         sig_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
@@ -340,8 +435,33 @@ This certification is provided by Park Evaluation Services in the regular course
         sig_label.runs[0].font.size = Pt(10)
         sig_label.runs[0].font.italic = True
 
-        # Placeholder for Park employee signature (you can add actual signature image here)
-        # doc.add_picture('path/to/park_signature.png', width=Inches(2))
+        # Add Park signature image from assets directory
+        park_sig_path = self.assets_dir / 'park_signature.png'
+        sig_added = False
+
+        print(f"Looking for Park signature at: {park_sig_path}")
+
+        if park_sig_path.exists():
+            try:
+                # Insert signature image ABOVE the line
+                sig_img_para = doc.paragraphs[-2]  # Get the signature line paragraph
+                run = sig_img_para.insert_paragraph_before().add_run()
+                run.add_picture(str(park_sig_path), width=Inches(2))
+                sig_added = True
+                print(f"Successfully added Park signature from: {park_sig_path}")
+            except Exception as e:
+                print(f"Error adding Park signature image: {e}")
+                import traceback
+                traceback.print_exc()
+        else:
+            print(f"Warning: Park signature file not found: {park_sig_path}")
+
+        if not sig_added:
+            # Add placeholder text if signature couldn't be loaded
+            sig_placeholder = doc.add_paragraph("[Park signature image not available]")
+            sig_placeholder.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            sig_placeholder.runs[0].font.size = Pt(9)
+            sig_placeholder.runs[0].font.italic = True
 
         doc.add_paragraph()  # Spacing
         doc.add_paragraph()  # Spacing
@@ -357,22 +477,56 @@ This certification is provided by Park Evaluation Services in the regular course
         print(f"Saved Park certificate to: {output_file}")
 
     def combine_documents(self, doc_paths, output_path):
-        """Combine multiple Word documents into one"""
+        """Combine multiple Word documents into one using safe section-based approach"""
 
-        # Create new document starting with first document
+        # Start with the first document (translation with header/footer)
         combined = Document(doc_paths[0])
 
-        # Add remaining documents
-        for doc_path in doc_paths[1:]:
-            # Add page break
-            combined.add_page_break()
-
-            # Read document to append
+        # Add remaining documents (certificates)
+        for idx, doc_path in enumerate(doc_paths[1:], start=1):
+            # Read the document to append
             sub_doc = Document(doc_path)
 
-            # Copy all elements
-            for element in sub_doc.element.body:
-                combined.element.body.append(element)
+            # Add a new section for this document (creates page break and allows different header/footer)
+            new_section = combined.add_section()
+
+            # Make sure this section doesn't inherit header/footer from previous section
+            new_section.header.is_linked_to_previous = False
+            new_section.footer.is_linked_to_previous = False
+
+            # Clear header and footer for this section (certificates shouldn't have them)
+            for paragraph in new_section.header.paragraphs:
+                paragraph.clear()
+            for paragraph in new_section.footer.paragraphs:
+                paragraph.clear()
+
+            # Copy all paragraphs from sub_doc
+            for paragraph in sub_doc.paragraphs:
+                # Create a new paragraph in the combined document
+                new_para = combined.add_paragraph(paragraph.text)
+                new_para.alignment = paragraph.alignment
+                new_para.style = paragraph.style
+
+                # Copy paragraph formatting
+                if paragraph.runs:
+                    # Clear the default run
+                    new_para.clear()
+                    for run in paragraph.runs:
+                        new_run = new_para.add_run(run.text)
+                        new_run.bold = run.bold
+                        new_run.italic = run.italic
+                        new_run.underline = run.underline
+                        if run.font.size:
+                            new_run.font.size = run.font.size
+                        if run.font.name:
+                            new_run.font.name = run.font.name
+
+            # Copy tables
+            for table in sub_doc.tables:
+                new_table = combined.add_table(rows=len(table.rows), cols=len(table.columns))
+                for i, row in enumerate(table.rows):
+                    for j, cell in enumerate(row.cells):
+                        new_table.rows[i].cells[j].text = cell.text
 
         # Save combined document
         combined.save(output_path)
