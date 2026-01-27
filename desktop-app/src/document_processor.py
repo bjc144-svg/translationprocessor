@@ -136,8 +136,17 @@ class DocumentProcessor:
             run = para.runs[0]
             run.font.size = Pt(10)
 
-        # Add horizontal line after header
-        header.add_paragraph("_" * 80)
+        # Add horizontal line after header using border instead of underscores
+        line_para = header.add_paragraph()
+        pPr = line_para._element.get_or_add_pPr()
+        pBdr = OxmlElement('w:pBdr')
+        bottom = OxmlElement('w:bottom')
+        bottom.set(qn('w:val'), 'single')
+        bottom.set(qn('w:sz'), '6')
+        bottom.set(qn('w:space'), '1')
+        bottom.set(qn('w:color'), '000000')
+        pBdr.append(bottom)
+        pPr.append(pBdr)
 
         # Add footer
         footer = section.footer
@@ -147,9 +156,17 @@ class DocumentProcessor:
         for paragraph in footer.paragraphs:
             paragraph.clear()
 
-        # Add horizontal line before footer
-        footer_line = footer.paragraphs[0]
-        footer_line.text = "_" * 80
+        # Add horizontal line before footer using border instead of underscores
+        line_para = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
+        pPr = line_para._element.get_or_add_pPr()
+        pBdr = OxmlElement('w:pBdr')
+        top = OxmlElement('w:top')
+        top.set(qn('w:val'), 'single')
+        top.set(qn('w:sz'), '6')
+        top.set(qn('w:space'), '1')
+        top.set(qn('w:color'), '000000')
+        pBdr.append(top)
+        pPr.append(pBdr)
 
         # Add "CERTIFIED TRANSLATION" (centered, all caps)
         cert_para = footer.add_paragraph("CERTIFIED TRANSLATION")
@@ -358,6 +375,7 @@ This certification is provided by Park Evaluation Services in the regular course
 
     def combine_documents(self, doc_paths, output_path):
         """Combine multiple Word documents into one"""
+        from copy import deepcopy
 
         # Create new document starting with first document
         combined = Document(doc_paths[0])
@@ -370,9 +388,11 @@ This certification is provided by Park Evaluation Services in the regular course
             # Read document to append
             sub_doc = Document(doc_path)
 
-            # Copy all elements
+            # Copy all elements using deepcopy to prevent XML corruption
             for element in sub_doc.element.body:
-                combined.element.body.append(element)
+                # Create a deep copy of the element to preserve all attributes and children
+                element_copy = deepcopy(element)
+                combined.element.body.append(element_copy)
 
         # Save combined document
         combined.save(output_path)
