@@ -107,7 +107,7 @@ class DocumentProcessor:
             paragraph.clear()
 
         # Create header table (2 columns)
-        header_table = header.add_table(rows=1, cols=2, width=Inches(6.5))
+        header_table = header.add_table(rows=1, cols=2)
         header_table.autofit = False
 
         # Left cell - Logo placeholder
@@ -158,7 +158,7 @@ class DocumentProcessor:
         cert_para.runs[0].font.size = Pt(12)
 
         # Add footer info table (3 columns)
-        footer_table = footer.add_table(rows=1, cols=3, width=Inches(6.5))
+        footer_table = footer.add_table(rows=1, cols=3)
         footer_table.autofit = False
 
         # Left - Case number
