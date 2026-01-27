@@ -4,11 +4,18 @@ Main GUI Application
 """
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
-from tkinterdnd2 import DND_FILES, TkinterDnD
 from datetime import datetime
 from pathlib import Path
 import json
 import sys
+
+# Try to import drag-and-drop support (optional)
+try:
+    from tkinterdnd2 import DND_FILES, TkinterDnD
+    HAS_DND = True
+except ImportError:
+    HAS_DND = False
+    print("Note: Drag-and-drop support not available. Use Browse button instead.")
 
 from translator_manager import TranslatorManager
 from document_processor import DocumentProcessor
@@ -79,10 +86,15 @@ class TranslationProcessorApp:
         file_frame.grid(row=row, column=0, sticky=(tk.W, tk.E), pady=10)
         file_frame.columnconfigure(0, weight=1)
 
-        # Drag and drop area
+        # Drag and drop area (or info label)
+        if HAS_DND:
+            drop_text = "Drag & Drop Word Document Here\n\nOR"
+        else:
+            drop_text = "Click Browse Button Below\nto Select Document"
+
         self.drop_area = tk.Label(
             file_frame,
-            text="Drag & Drop Word Document Here\n\nOR",
+            text=drop_text,
             relief=tk.RIDGE,
             bg="#f0f0f0",
             font=("Arial", 12),
@@ -90,9 +102,10 @@ class TranslationProcessorApp:
         )
         self.drop_area.grid(row=0, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
 
-        # Enable drag and drop
-        self.drop_area.drop_target_register(DND_FILES)
-        self.drop_area.dnd_bind('<<Drop>>', self.on_file_drop)
+        # Enable drag and drop (only if available)
+        if HAS_DND:
+            self.drop_area.drop_target_register(DND_FILES)
+            self.drop_area.dnd_bind('<<Drop>>', self.on_file_drop)
 
         # Browse button
         browse_btn = ttk.Button(
@@ -418,7 +431,12 @@ class TranslationProcessorApp:
 def main():
     """Main entry point"""
     try:
-        root = TkinterDnD.Tk()
+        # Use TkinterDnD if available, otherwise use standard Tk
+        if HAS_DND:
+            root = TkinterDnD.Tk()
+        else:
+            root = tk.Tk()
+
         app = TranslationProcessorApp(root)
         root.mainloop()
     except Exception as e:

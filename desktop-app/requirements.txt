@@ -1,20 +1,16 @@
 # Translation Processor Desktop App Requirements
 
-# GUI Framework
-tkinterdnd2==0.3.0
-
-# Document Processing
+# Core Document Processing (REQUIRED)
 python-docx==1.1.0
+
+# PDF Conversion (REQUIRED - requires Microsoft Word)
 docx2pdf==0.1.8
-
-# PDF Generation and Manipulation
-pypdf==3.17.4
-reportlab==4.0.7
-pillow==10.1.0
-
-# Data Management
-requests==2.31.0
-
-# Utilities
-python-dateutil==2.8.2
 pywin32==306
+
+# Image Processing (for logos/signatures)
+Pillow>=9.0.0
+
+# Optional - Drag and Drop support
+# If this fails to install, app will still work with Browse button
+# Uncomment to enable drag-and-drop:
+# tkinterdnd2==0.3.0
