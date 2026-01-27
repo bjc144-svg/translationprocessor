@@ -15,7 +15,7 @@
             </div>
             <nav>
                 <a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}">Process Translation</a>
-                <a href="{{ url_for('translators') }}" class="{% if request.endpoint == 'translators' %}active{% endif %}">Manage Translators</a>
+                <a href="{{ url_for('translators') }}" class="{% if request.endpoint == 'translators' %}active{% endif %}">Administration</a>
             </nav>
         </div>
     </header>

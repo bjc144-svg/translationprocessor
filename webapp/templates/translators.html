@@ -1,11 +1,11 @@
 {% extends "layout.html" %}
 
-{% block title %}Manage Translators{% endblock %}
+{% block title %}Administration{% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <h2>Translator Management</h2>
-    <p>Add, view, and manage translators and their signatures</p>
+    <h2>Administration</h2>
+    <p>Manage translators and their signatures</p>
 </div>
 
 <div class="translator-container">
@@ -16,12 +16,6 @@
             <div class="form-group">
                 <label for="name">Translator Name: <span class="required">*</span></label>
                 <input type="text" id="name" name="name" required placeholder="e.g., John Smith">
-            </div>
-
-            <div class="form-group">
-                <label for="language_pairs">Language Pairs: <span class="required">*</span></label>
-                <textarea id="language_pairs" name="language_pairs" rows="5" required placeholder="Enter one language pair per line, e.g.:&#10;Spanish > English&#10;French > English&#10;German > English"></textarea>
-                <small>One per line, format: "Source > Target"</small>
             </div>
 
             <div class="form-group">
@@ -44,14 +38,6 @@
                     <div class="translator-item">
                         <div class="translator-info">
                             <h4>{{ translator.name }}</h4>
-                            <div class="language-pairs">
-                                <strong>Language Pairs:</strong>
-                                <ul>
-                                    {% for pair in translator.language_pairs %}
-                                        <li>{{ pair }}</li>
-                                    {% endfor %}
-                                </ul>
-                            </div>
                             <div class="signature-status">
                                 <strong>Signature:</strong>
                                 {% if translator.signature_path %}
@@ -65,7 +51,7 @@
                             </small>
                         </div>
                         <div class="translator-actions">
-                            <button type="button" class="btn btn-primary btn-small" onclick="showEditForm('{{ translator.name }}', '{{ translator.language_pairs|join('\\n') }}', '{{ translator.signature_path or '' }}')">Edit</button>
+                            <button type="button" class="btn btn-primary btn-small" onclick="showEditForm('{{ translator.name }}', '{{ translator.signature_path or '' }}')">Edit</button>
                             <form action="{{ url_for('delete_translator', name=translator.name) }}" method="post" style="display:inline;" onsubmit="return confirm('Delete translator {{ translator.name }}? This cannot be undone.');">
                                 <button type="submit" class="btn btn-danger btn-small">Delete</button>
                             </form>
@@ -86,7 +72,6 @@
         <h3>Tips</h3>
         <ul class="instructions">
             <li><strong>Name:</strong> Enter translator's full name as it should appear on certificates</li>
-            <li><strong>Language Pairs:</strong> List all language combinations this translator works with</li>
             <li><strong>Signature:</strong> Upload a clear signature image (PNG with transparent background recommended)</li>
             <li><strong>Shared Database:</strong> All translators added here are available to all users on the network</li>
         </ul>
@@ -106,12 +91,6 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="edit_language_pairs">Language Pairs: <span class="required">*</span></label>
-                        <textarea id="edit_language_pairs" name="language_pairs" rows="5" required></textarea>
-                        <small>One per line, format: "Source > Target"</small>
-                    </div>
-
-                    <div class="form-group">
                         <label for="edit_signature">Update Signature (PNG/JPG):</label>
                         <input type="file" id="edit_signature" name="signature" accept=".png,.jpg,.jpeg,.gif">
                         <small id="current_signature_text">Optional: Upload new signature to replace existing</small>
@@ -128,10 +107,9 @@
 </div>
 
 <script>
-function showEditForm(name, languagePairs, signaturePath) {
+function showEditForm(name, signaturePath) {
     document.getElementById('edit_old_name').value = name;
     document.getElementById('edit_name').value = name;
-    document.getElementById('edit_language_pairs').value = languagePairs;
 
     // Update form action
     document.getElementById('editTranslatorForm').action = "{{ url_for('update_translator', old_name='PLACEHOLDER') }}".replace('PLACEHOLDER', encodeURIComponent(name));

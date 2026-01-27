@@ -250,18 +250,13 @@ def add_translator():
     """Add new translator"""
 
     name = request.form.get('name', '').strip()
-    language_pairs = request.form.get('language_pairs', '').strip()
 
     if not name:
         flash('Translator name is required', 'error')
         return redirect(url_for('translators'))
 
-    if not language_pairs:
-        flash('At least one language pair is required', 'error')
-        return redirect(url_for('translators'))
-
-    # Parse language pairs (one per line)
-    pairs = [line.strip() for line in language_pairs.split('\n') if line.strip()]
+    # Language pairs no longer required - default to empty list
+    pairs = []
 
     # Handle signature upload
     signature_path = None
@@ -298,18 +293,13 @@ def update_translator(old_name):
     """Update existing translator"""
 
     new_name = request.form.get('name', '').strip()
-    language_pairs = request.form.get('language_pairs', '').strip()
 
     if not new_name:
         flash('Translator name is required', 'error')
         return redirect(url_for('translators'))
 
-    if not language_pairs:
-        flash('At least one language pair is required', 'error')
-        return redirect(url_for('translators'))
-
-    # Parse language pairs (one per line)
-    pairs = [line.strip() for line in language_pairs.split('\n') if line.strip()]
+    # Language pairs no longer required - default to empty list
+    pairs = []
 
     # Handle signature upload
     signature_path = None
