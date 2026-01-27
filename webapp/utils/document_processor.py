@@ -426,7 +426,7 @@ This certification is provided by Park Evaluation Services in the regular course
 
         doc.add_paragraph()  # Spacing
 
-        # Signature section (Park employee - fixed)
+        # Signature section (Park employee)
         sig_para = doc.add_paragraph("_" * 40)
         sig_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
@@ -435,8 +435,33 @@ This certification is provided by Park Evaluation Services in the regular course
         sig_label.runs[0].font.size = Pt(10)
         sig_label.runs[0].font.italic = True
 
-        # Placeholder for Park employee signature (you can add actual signature image here)
-        # doc.add_picture('path/to/park_signature.png', width=Inches(2))
+        # Add Park signature image from assets directory
+        park_sig_path = self.assets_dir / 'park_signature.png'
+        sig_added = False
+
+        print(f"Looking for Park signature at: {park_sig_path}")
+
+        if park_sig_path.exists():
+            try:
+                # Insert signature image ABOVE the line
+                sig_img_para = doc.paragraphs[-2]  # Get the signature line paragraph
+                run = sig_img_para.insert_paragraph_before().add_run()
+                run.add_picture(str(park_sig_path), width=Inches(2))
+                sig_added = True
+                print(f"Successfully added Park signature from: {park_sig_path}")
+            except Exception as e:
+                print(f"Error adding Park signature image: {e}")
+                import traceback
+                traceback.print_exc()
+        else:
+            print(f"Warning: Park signature file not found: {park_sig_path}")
+
+        if not sig_added:
+            # Add placeholder text if signature couldn't be loaded
+            sig_placeholder = doc.add_paragraph("[Park signature image not available]")
+            sig_placeholder.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            sig_placeholder.runs[0].font.size = Pt(9)
+            sig_placeholder.runs[0].font.italic = True
 
         doc.add_paragraph()  # Spacing
         doc.add_paragraph()  # Spacing
