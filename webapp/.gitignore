@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# Application data
+data/*.json
+data/*.json.bak
+data/signatures/*.png
+data/signatures/*.jpg
+data/signatures/*.jpeg
+
+# Keep folder structure
+!data/.gitkeep
+!data/signatures/.gitkeep
+
+# Uploads and outputs
+uploads/*
+!uploads/.gitkeep
+output/*
+!output/.gitkeep
+
+# Assets (user-specific)
+assets/*.png
+assets/*.jpg
+assets/*.jpeg
+!assets/.gitkeep
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+*.logs
+
+# Temp files
+*.tmp
+*.temp

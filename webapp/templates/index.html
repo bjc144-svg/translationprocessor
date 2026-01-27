@@ -1,0 +1,169 @@
+{% extends "layout.html" %}
+
+{% block title %}Process Translation{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Process Translation Document</h2>
+    <p>Upload a translated Word document and generate a certified PDF</p>
+</div>
+
+<div class="form-container">
+    <!-- File Upload Section -->
+    <div class="card">
+        <h3>1. Upload Document</h3>
+        <form action="{{ url_for('upload_file') }}" method="post" enctype="multipart/form-data" id="uploadForm">
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">📄</div>
+                <p class="upload-text">
+                    {% if session.get('original_filename') %}
+                        <strong>Selected:</strong> {{ session.get('original_filename') }}
+                    {% else %}
+                        Click to browse or drag and drop a Word document (.docx)
+                    {% endif %}
+                </p>
+                <input type="file" name="document" id="documentInput" accept=".docx" required onchange="handleFileSelect(this)">
+                <button type="submit" class="btn btn-primary" id="uploadBtn" {% if not session.get('uploaded_file') %}style="display:none"{% endif %}>
+                    Upload File
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Case Information Section -->
+    <div class="card" id="metadataSection" {% if not session.get('uploaded_file') %}style="opacity:0.5; pointer-events:none"{% endif %}>
+        <h3>2. Enter Case Information</h3>
+        <form action="{{ url_for('process_document') }}" method="post" id="processForm">
+            <div class="form-group">
+                <label for="caseNumber">Case Number: <span class="required">*</span></label>
+                <input type="text" id="caseNumber" name="case_number" required placeholder="e.g., 12345">
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="sourceLanguage">Source Language: <span class="required">*</span></label>
+                    <input type="text" id="sourceLanguage" name="source_language" list="languagesList" required placeholder="e.g., Spanish">
+                </div>
+
+                <div class="form-group">
+                    <label for="targetLanguage">Target Language: <span class="required">*</span></label>
+                    <input type="text" id="targetLanguage" name="target_language" list="languagesList" required value="English">
+                </div>
+            </div>
+
+            <datalist id="languagesList">
+                {% for language in languages %}
+                    <option value="{{ language }}">
+                {% endfor %}
+            </datalist>
+
+            <div class="form-group">
+                <label for="translator">Translator: <span class="required">*</span></label>
+                <select id="translator" name="translator" required>
+                    <option value="">-- Select Translator --</option>
+                    {% for translator in translators %}
+                        <option value="{{ translator }}">{{ translator }}</option>
+                    {% endfor %}
+                </select>
+                <small>Don't see your translator? <a href="{{ url_for('translators') }}">Add them here</a></small>
+            </div>
+
+            <div class="form-group">
+                <label for="date">Date: <span class="required">*</span></label>
+                <input type="text" id="date" name="date" required value="{{ current_date }}">
+            </div>
+
+            <div class="button-group">
+                <button type="submit" class="btn btn-success btn-large" {% if not session.get('uploaded_file') %}disabled{% endif %}>
+                    ✓ Process Translation
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="clearForm()">
+                    Clear
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Instructions -->
+    <div class="card info-card">
+        <h3>How It Works</h3>
+        <ol class="instructions">
+            <li><strong>Upload</strong> your translated Word document (.docx)</li>
+            <li><strong>Enter</strong> case information (case number, languages, translator)</li>
+            <li><strong>Click</strong> "Process Translation" to generate certified PDF</li>
+            <li><strong>Download</strong> the PDF and upload to Plunet</li>
+        </ol>
+
+        <h4>Output Format:</h4>
+        <ul class="instructions">
+            <li>✓ Translation with branded header and footer</li>
+            <li>✓ Translator certification page</li>
+            <li>✓ Park employee certification page</li>
+            <li>✓ Everything combined in one PDF file</li>
+        </ul>
+    </div>
+</div>
+
+<script>
+function handleFileSelect(input) {
+    if (input.files && input.files[0]) {
+        document.getElementById('uploadBtn').style.display = 'block';
+    }
+}
+
+function clearForm() {
+    if (confirm('Clear the form and remove uploaded file?')) {
+        fetch('{{ url_for("clear") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            }
+        }).then(() => {
+            window.location.reload();
+        });
+    }
+}
+
+// Drag and drop functionality
+const uploadArea = document.getElementById('uploadArea');
+const fileInput = document.getElementById('documentInput');
+
+['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+    uploadArea.addEventListener(eventName, preventDefaults, false);
+});
+
+function preventDefaults(e) {
+    e.preventDefault();
+    e.stopPropagation();
+}
+
+['dragenter', 'dragover'].forEach(eventName => {
+    uploadArea.addEventListener(eventName, () => {
+        uploadArea.classList.add('drag-over');
+    }, false);
+});
+
+['dragleave', 'drop'].forEach(eventName => {
+    uploadArea.addEventListener(eventName, () => {
+        uploadArea.classList.remove('drag-over');
+    }, false);
+});
+
+uploadArea.addEventListener('drop', (e) => {
+    const dt = e.dataTransfer;
+    const files = dt.files;
+
+    if (files.length > 0) {
+        fileInput.files = files;
+        handleFileSelect(fileInput);
+    }
+}, false);
+
+// Click to browse
+uploadArea.addEventListener('click', (e) => {
+    if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT') {
+        fileInput.click();
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,75 @@
+{% extends "layout.html" %}
+
+{% block title %}Download PDF{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>✓ Translation Processed Successfully!</h2>
+</div>
+
+<div class="download-container">
+    <div class="card success-card">
+        <div class="success-icon">✓</div>
+        <h3>Your certified translation is ready</h3>
+
+        <div class="file-info">
+            <p><strong>Filename:</strong> {{ filename }}</p>
+            <p><strong>Generated:</strong> {{ current_date() }}</p>
+        </div>
+
+        <div class="button-group">
+            <a href="{{ url_for('download_file', filename=filename) }}" class="btn btn-success btn-large">
+                📥 Download PDF
+            </a>
+            <a href="{{ url_for('index') }}" class="btn btn-primary">
+                Process Another Document
+            </a>
+        </div>
+
+        <div class="instructions">
+            <h4>Next Steps:</h4>
+            <ol>
+                <li>Click "Download PDF" above</li>
+                <li>Review the PDF to ensure everything looks correct</li>
+                <li>Upload the PDF to Plunet</li>
+                <li>Archive or delete the source Word document</li>
+            </ol>
+        </div>
+    </div>
+
+    <div class="card info-card">
+        <h3>What's in the PDF?</h3>
+        <ul class="instructions">
+            <li><strong>Page 1+:</strong> Your translation with branded header and footer
+                <ul>
+                    <li>Header: Company logo and contact information</li>
+                    <li>Footer: "CERTIFIED TRANSLATION", case number, page numbers, language pair</li>
+                </ul>
+            </li>
+            <li><strong>Certificate 1:</strong> Translator certification
+                <ul>
+                    <li>Translator's name and signature</li>
+                    <li>Certification statement</li>
+                    <li>Case details</li>
+                </ul>
+            </li>
+            <li><strong>Certificate 2:</strong> Park Evaluation Services certification
+                <ul>
+                    <li>Company certification statement</li>
+                    <li>Authorized signature</li>
+                    <li>Case details</li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+</div>
+
+<script>
+// Auto-download after 2 seconds
+setTimeout(function() {
+    if (confirm('Ready to download the PDF?')) {
+        window.location.href = "{{ url_for('download_file', filename=filename) }}";
+    }
+}, 2000);
+</script>
+{% endblock %}
