@@ -451,6 +451,13 @@ class DocumentProcessor:
             stats['total'] += 1
             element_tag = element.tag.split('}')[-1]  # Extract tag name without namespace
 
+            # Skip sectPr (section properties) - we want all content in the target's existing section
+            # Copying sectPr would create additional sections and cause layout issues
+            if element_tag == 'sectPr':
+                print(f"⊘ Skipping sectPr (section properties) - using target document's section settings")
+                stats['total'] -= 1  # Don't count as processed
+                continue
+
             try:
                 # Attempt deep copy (preserves ALL XML structure)
                 new_element = deepcopy(element)
@@ -1045,6 +1052,12 @@ class DocumentProcessor:
 
             # Add a new section for this document (creates page break and allows different header/footer)
             new_section = combined.add_section()
+
+            # Set standard Letter size and Portrait orientation for certificates
+            # This prevents certificates from inheriting custom sizing from source documents
+            new_section.page_height = Inches(11)  # Letter height
+            new_section.page_width = Inches(8.5)  # Letter width
+            new_section.orientation = 0  # 0 = Portrait, 1 = Landscape
 
             # Make sure this section doesn't inherit header/footer from previous section
             new_section.header.is_linked_to_previous = False
