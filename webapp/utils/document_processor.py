@@ -517,13 +517,19 @@ class DocumentProcessor:
                 if old_rid and old_rid in source_doc.part.related_parts:
                     # Get or create new relationship
                     new_rid = self._copy_relationship(old_rid, source_doc, target_doc, rel_map)
-                    # Update element to use new relationship ID
-                    child.set(attr, new_rid)
+
+                    if new_rid is None:
+                        # Remove the relationship reference (unsupported type or header/footer)
+                        if attr in child.attrib:
+                            del child.attrib[attr]
+                    else:
+                        # Update element to use new relationship ID
+                        child.set(attr, new_rid)
 
     def _copy_relationship(self, old_rid, source_doc, target_doc, rel_map):
         """
         Copy a relationship and its associated part to target document.
-        Returns new relationship ID.
+        Returns new relationship ID, or None if the relationship should be removed.
         """
         # Check cache first
         if old_rid in rel_map:
@@ -542,11 +548,13 @@ class DocumentProcessor:
         if 'image' in content_type:
             try:
                 from io import BytesIO
+                from docx.opc.constants import RELATIONSHIP_TYPE as RT
 
-                # Create new image part using get_or_add_image_part
+                # Create new image part using get_or_add_image
                 # This properly creates an ImagePart object and adds it to the package
                 image_stream = BytesIO(part_data)
-                image_part, new_rid = target_doc.part.get_or_add_image_part(image_stream)
+                image_part = target_doc.part.get_or_add_image(image_stream)
+                new_rid = target_doc.part.relate_to(image_part, RT.IMAGE)
 
                 # Cache mapping
                 rel_map[old_rid] = new_rid
@@ -557,12 +565,18 @@ class DocumentProcessor:
                 print(f"Error copying image relationship {old_rid}: {e}")
                 import traceback
                 traceback.print_exc()
-                return old_rid
+                return None  # Signal to remove this relationship reference
 
-        # For other types (embedded objects, charts, etc.), return unchanged for now
+        # Skip header/footer relationships - we add our own headers/footers
+        # These relationship IDs from the source document don't exist in the target
+        if 'header' in content_type or 'footer' in content_type:
+            print(f"⊘ Skipping {content_type} relationship (we add our own headers/footers)")
+            return None  # Signal to remove this relationship reference
+
+        # For other types (embedded objects, charts, etc.), skip them for now
         # Can be expanded later if needed
-        print(f"Info: Relationship type '{content_type}' not fully supported, using original rId")
-        return old_rid
+        print(f"⊘ Skipping relationship type '{content_type}' (not yet supported)")
+        return None  # Signal to remove this relationship reference
 
     def _fallback_copy_paragraph(self, element, source_doc, target_doc):
         """
