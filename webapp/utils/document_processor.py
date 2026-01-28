@@ -176,7 +176,13 @@ class DocumentProcessor:
             new_section.right_margin = original_section.right_margin
             new_section.gutter = original_section.gutter
 
+            # Copy page size and orientation
+            new_section.page_height = original_section.page_height
+            new_section.page_width = original_section.page_width
+            new_section.orientation = original_section.orientation
+
             print(f"Copied margins - Top: {new_section.top_margin}, Bottom: {new_section.bottom_margin}, Left: {new_section.left_margin}, Right: {new_section.right_margin}")
+            print(f"Copied page size - Height: {new_section.page_height}, Width: {new_section.page_width}, Orientation: {new_section.orientation}")
 
         # Copy document body using deep copy to preserve all element types
         self._copy_document_body(original_doc, doc)
