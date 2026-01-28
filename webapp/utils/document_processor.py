@@ -465,6 +465,10 @@ class DocumentProcessor:
                 # Reconcile relationship IDs (images, shapes, embedded objects)
                 self._reconcile_relationships(new_element, source_doc, target_doc, rel_mapping)
 
+                # Remove section properties from within paragraph properties
+                # Section breaks in source document would create unwanted sections in target
+                self._remove_section_properties(new_element)
+
                 # Append to target document body
                 target_doc.element.body.append(new_element)
                 stats['deepcopy_success'] += 1
@@ -539,6 +543,29 @@ class DocumentProcessor:
         for parent, child in elements_to_remove:
             if parent is not None:
                 parent.remove(child)
+
+    def _remove_section_properties(self, element):
+        """
+        Remove all sectPr (section properties) elements from within the element tree.
+        Section breaks from the source document would create unwanted sections in target.
+        We want all content in a single section with our headers/footers.
+        """
+        # Find all sectPr elements within the element tree
+        # These can appear in paragraph properties (pPr)
+        w_ns = '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}'
+        sectPr_tag = f'{w_ns}sectPr'
+
+        # Collect all sectPr elements to remove
+        sectPr_elements = []
+        for child in element.iter():
+            if child.tag == sectPr_tag:
+                sectPr_elements.append((child.getparent(), child))
+
+        # Remove them
+        for parent, sectPr in sectPr_elements:
+            if parent is not None:
+                parent.remove(sectPr)
+                print(f"  ⊘ Removed sectPr from within element (prevents section breaks)")
 
     def _copy_relationship(self, old_rid, source_doc, target_doc, rel_map):
         """
