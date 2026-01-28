@@ -549,11 +549,13 @@ class DocumentProcessor:
             try:
                 from io import BytesIO
                 from docx.opc.constants import RELATIONSHIP_TYPE as RT
+                from docx.parts.image import ImagePart
 
-                # Create new image part using get_or_add_image
-                # This properly creates an ImagePart object and adds it to the package
+                # Create new image part and add it to the package
                 image_stream = BytesIO(part_data)
-                image_part = target_doc.part.get_or_add_image(image_stream)
+                image_part = ImagePart.new(target_doc.part.package, image_stream)
+
+                # Create relationship from document to image part
                 new_rid = target_doc.part.relate_to(image_part, RT.IMAGE)
 
                 # Cache mapping
