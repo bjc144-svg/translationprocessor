@@ -506,9 +506,9 @@ class DocumentProcessor:
         for paragraph in section.footer.paragraphs:
             paragraph.clear()
 
-        # Add logo
+        # Add logo (left-aligned)
         logo_para = doc.add_paragraph()
-        logo_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        logo_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
         # Try to add logo image
         logo_path = self.assets_dir / 'park_logo.png'
@@ -532,18 +532,14 @@ class DocumentProcessor:
             run.font.bold = True
             print(f"Warning: Park logo file not found at: {logo_path}")
 
-        doc.add_paragraph()  # Spacing
-
-        # Add DATE at top right
+        # Add DATE at top right (with actual date)
         date_para = doc.add_paragraph()
         date_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-        run = date_para.add_run("DATE")
+        run = date_para.add_run(metadata['date'])
         run.font.size = Pt(11)
         run.font.bold = True
 
-        doc.add_paragraph()  # Spacing
-
-        # Title
+        # Title (no extra spacing before)
         title = doc.add_paragraph()
         title.alignment = WD_ALIGN_PARAGRAPH.CENTER
         run = title.add_run("TRANSLATION CERTIFICATION")
@@ -551,9 +547,7 @@ class DocumentProcessor:
         run.font.bold = True
         run.font.all_caps = True
 
-        doc.add_paragraph()  # Spacing
-
-        # Certificate text - First paragraph (justified)
+        # Certificate text - First paragraph (justified) (no extra spacing before)
         para1_text = f"I, {metadata['translator_name']}, am fluent and competent in both the {metadata['source_language']} and {metadata['target_language']} languages. I certify that the enclosed translation is true, complete, and accurate and that, to the best of my knowledge and belief, the translation accurately reflects the meaning and intention of the original text. I am not a family member, friend, or business associate of anyone referenced in this translation but a completely disinterested third party with no relationship to the beneficiary."
 
         para1 = doc.add_paragraph(para1_text)
@@ -572,14 +566,11 @@ class DocumentProcessor:
             run.font.size = Pt(11)
 
         doc.add_paragraph()  # Spacing
-        doc.add_paragraph()  # Spacing
 
         # Add "Sincerely,"
         sincerely = doc.add_paragraph("Sincerely,")
         sincerely.alignment = WD_ALIGN_PARAGRAPH.LEFT
         sincerely.runs[0].font.size = Pt(11)
-
-        doc.add_paragraph()  # Spacing for signature
 
         # Add signature image if available
         sig_added = False
@@ -615,16 +606,11 @@ class DocumentProcessor:
         sig_label.alignment = WD_ALIGN_PARAGRAPH.LEFT
         sig_label.runs[0].font.size = Pt(11)
 
-        doc.add_paragraph()  # Spacing
-        doc.add_paragraph()  # Spacing
-
-        # Add CaseNumber
-        case_para = doc.add_paragraph(f"CaseNumber")
+        # Add actual case number
+        case_para = doc.add_paragraph(f"Park Case #{metadata['case_number']}")
         case_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
         case_para.runs[0].font.size = Pt(11)
 
-        doc.add_paragraph()  # Spacing
-        doc.add_paragraph()  # Spacing
         doc.add_paragraph()  # Spacing
 
         # Footer with contact info in green
@@ -657,9 +643,9 @@ class DocumentProcessor:
         for paragraph in section.footer.paragraphs:
             paragraph.clear()
 
-        # Add logo
+        # Add logo (left-aligned)
         logo_para = doc.add_paragraph()
-        logo_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        logo_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
         # Try to add logo image
         logo_path = self.assets_dir / 'park_logo.png'
@@ -695,26 +681,22 @@ class DocumentProcessor:
 
         doc.add_paragraph()  # Spacing
 
-        # Certificate text
-        cert_text = f"""Park Evaluation Services hereby certifies that the attached translation has been reviewed and verified for accuracy and completeness.
+        # Certificate text - First paragraph (justified)
+        para1_text = f"This is to certify that the enclosed {metadata['source_language']} to {metadata['target_language']} translation (Park Case #{metadata['case_number']}) was made under my personal supervision by a qualified translator who is fluent in both languages, and that to the best of my knowledge and understanding is a true and complete rendition of the corresponding original document. This document has not been translated for a family member, friend, or business associate but by a completely disinterested third party with no relationship to the beneficiary."
 
-This translation was performed by a qualified translator competent in {metadata['language_pair']}.
+        para1 = doc.add_paragraph(para1_text)
+        para1.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        for run in para1.runs:
+            run.font.size = Pt(11)
 
-The translation services provided meet professional standards and are suitable for official use.
+        doc.add_paragraph()  # Spacing
 
-Date: {metadata['date']}
+        # Certificate text - Second paragraph (justified)
+        para2_text = "This is to certify the correctness of the translation only. We do not make any claims or guarantees about the authenticity or content of the original document. Further, Park Evaluations assumes no liability for the way in which the translation is used by the customer or any third party, including end-users of the translation."
 
-Language Pair: {metadata['language_pair']}
-
-Case Number: Park Case #{metadata['case_number']}
-
-This certification is provided by Park Evaluation Services in the regular course of business.
-"""
-
-        para = doc.add_paragraph(cert_text)
-        para.alignment = WD_ALIGN_PARAGRAPH.LEFT
-
-        for run in para.runs:
+        para2 = doc.add_paragraph(para2_text)
+        para2.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        for run in para2.runs:
             run.font.size = Pt(11)
 
         doc.add_paragraph()  # Spacing
