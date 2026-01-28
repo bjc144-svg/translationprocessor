@@ -172,85 +172,142 @@ class DocumentProcessor:
 
         # Copy all paragraphs from the original document (regardless of sections)
         from io import BytesIO
-        for para in original_doc.paragraphs:
-            new_para = doc.add_paragraph()
-            new_para.alignment = para.alignment
-            new_para.style = para.style
+        from docx.oxml import parse_xml
+        from lxml import etree
 
-            # Copy runs (text with formatting and images)
-            for run in para.runs:
-                # Check if run contains an image
-                has_image = False
-                drawings = run._element.findall('.//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}drawing', run._element.nsmap if hasattr(run._element, 'nsmap') else None)
+        # IMPORTANT: Copy body elements in order to preserve document structure
+        # This handles paragraphs, tables, and their proper sequencing
+        for element in original_doc.element.body:
+            # Check if it's a paragraph
+            if element.tag.endswith('}p'):
+                # Create corresponding paragraph in new document
+                new_para = doc.add_paragraph()
 
-                if not drawings:
-                    for child in run._element:
-                        if 'drawing' in child.tag or 'pict' in child.tag:
-                            drawings = [child]
-                            break
+                # Find the original paragraph object
+                for para in original_doc.paragraphs:
+                    if para._element == element:
+                        # Copy paragraph properties
+                        new_para.alignment = para.alignment
+                        new_para.style = para.style
 
-                if drawings:
-                    has_image = True
-                    # Copy images
-                    for drawing in drawings:
-                        try:
-                            ns = {'a': 'http://schemas.openxmlformats.org/drawingml/2006/main',
-                                  'r': 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'}
-                            blip = drawing.find('.//a:blip', ns)
+                        # Copy paragraph formatting
+                        if para.paragraph_format.space_before:
+                            new_para.paragraph_format.space_before = para.paragraph_format.space_before
+                        if para.paragraph_format.space_after:
+                            new_para.paragraph_format.space_after = para.paragraph_format.space_after
+                        if para.paragraph_format.line_spacing:
+                            new_para.paragraph_format.line_spacing = para.paragraph_format.line_spacing
 
-                            if blip is None:
-                                for elem in drawing.iter():
-                                    if 'blip' in elem.tag.lower():
-                                        blip = elem
+                        # Copy runs (text with formatting and images)
+                        for run in para.runs:
+                            # Check if run contains an image
+                            has_image = False
+                            drawings = run._element.findall('.//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}drawing', run._element.nsmap if hasattr(run._element, 'nsmap') else None)
+
+                            if not drawings:
+                                for child in run._element:
+                                    if 'drawing' in child.tag or 'pict' in child.tag:
+                                        drawings = [child]
                                         break
 
-                            if blip is not None:
-                                rId = blip.get('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed')
-                                if not rId:
-                                    rId = blip.get('embed')
+                            if drawings:
+                                has_image = True
+                                # Copy images
+                                for drawing in drawings:
+                                    try:
+                                        ns = {'a': 'http://schemas.openxmlformats.org/drawingml/2006/main',
+                                              'r': 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'}
+                                        blip = drawing.find('.//a:blip', ns)
 
-                                if rId and rId in original_doc.part.related_parts:
-                                    image_part = original_doc.part.related_parts[rId]
-                                    image_bytes = image_part.blob
+                                        if blip is None:
+                                            for elem in drawing.iter():
+                                                if 'blip' in elem.tag.lower():
+                                                    blip = elem
+                                                    break
 
-                                    # Get image dimensions
-                                    extent = drawing.find('.//wp:extent', {'wp': 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing'})
-                                    if extent is None:
-                                        for elem in drawing.iter():
-                                            if 'extent' in elem.tag.lower():
-                                                extent = elem
-                                                break
+                                        if blip is not None:
+                                            rId = blip.get('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed')
+                                            if not rId:
+                                                rId = blip.get('embed')
 
-                                    new_run = new_para.add_run()
-                                    if extent is not None and extent.get('cx'):
-                                        try:
-                                            cx = int(extent.get('cx'))
-                                            width_inches = cx / 914400.0
-                                            new_run.add_picture(BytesIO(image_bytes), width=Inches(width_inches))
-                                        except:
-                                            new_run.add_picture(BytesIO(image_bytes))
+                                            if rId and rId in original_doc.part.related_parts:
+                                                image_part = original_doc.part.related_parts[rId]
+                                                image_bytes = image_part.blob
+
+                                                # Get image dimensions
+                                                extent = drawing.find('.//wp:extent', {'wp': 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing'})
+                                                if extent is None:
+                                                    for elem in drawing.iter():
+                                                        if 'extent' in elem.tag.lower():
+                                                            extent = elem
+                                                            break
+
+                                                new_run = new_para.add_run()
+                                                if extent is not None and extent.get('cx'):
+                                                    try:
+                                                        cx = int(extent.get('cx'))
+                                                        width_inches = cx / 914400.0
+                                                        new_run.add_picture(BytesIO(image_bytes), width=Inches(width_inches))
+                                                    except Exception as ex:
+                                                        print(f"Error sizing image: {ex}")
+                                                        new_run.add_picture(BytesIO(image_bytes))
+                                                else:
+                                                    new_run.add_picture(BytesIO(image_bytes))
+                                    except Exception as e:
+                                        print(f"Warning: Could not copy image: {e}")
+                                        import traceback
+                                        traceback.print_exc()
+
+                            # Copy text if no image
+                            if not has_image:
+                                new_run = new_para.add_run(run.text)
+                                new_run.bold = run.bold
+                                new_run.italic = run.italic
+                                new_run.underline = run.underline
+                                if run.font.size:
+                                    new_run.font.size = run.font.size
+                                if run.font.name:
+                                    new_run.font.name = run.font.name
+                        break
+
+            # Check if it's a table
+            elif element.tag.endswith('}tbl'):
+                # Find the original table object
+                for table in original_doc.tables:
+                    if table._element == element:
+                        # Create table with same dimensions
+                        new_table = doc.add_table(rows=len(table.rows), cols=len(table.columns))
+
+                        # Copy table style if it exists
+                        if table.style:
+                            new_table.style = table.style
+
+                        # Copy cell content and formatting
+                        for i, row in enumerate(table.rows):
+                            for j, cell in enumerate(row.cells):
+                                new_cell = new_table.rows[i].cells[j]
+
+                                # Copy each paragraph in the cell
+                                new_cell.text = ""  # Clear default paragraph
+                                for k, para in enumerate(cell.paragraphs):
+                                    if k == 0:
+                                        cell_para = new_cell.paragraphs[0]
                                     else:
-                                        new_run.add_picture(BytesIO(image_bytes))
-                        except Exception as e:
-                            print(f"Warning: Could not copy image: {e}")
+                                        cell_para = new_cell.add_paragraph()
 
-                # Copy text if no image
-                if not has_image:
-                    new_run = new_para.add_run(run.text)
-                    new_run.bold = run.bold
-                    new_run.italic = run.italic
-                    new_run.underline = run.underline
-                    if run.font.size:
-                        new_run.font.size = run.font.size
-                    if run.font.name:
-                        new_run.font.name = run.font.name
+                                    cell_para.alignment = para.alignment
 
-        # Copy tables from the original document
-        for table in original_doc.tables:
-            new_table = doc.add_table(rows=len(table.rows), cols=len(table.columns))
-            for i, row in enumerate(table.rows):
-                for j, cell in enumerate(row.cells):
-                    new_table.rows[i].cells[j].text = cell.text
+                                    # Copy runs with formatting
+                                    for run in para.runs:
+                                        new_run = cell_para.add_run(run.text)
+                                        new_run.bold = run.bold
+                                        new_run.italic = run.italic
+                                        new_run.underline = run.underline
+                                        if run.font.size:
+                                            new_run.font.size = run.font.size
+                                        if run.font.name:
+                                            new_run.font.name = run.font.name
+                        break
 
         print(f"Consolidated document has {len(doc.sections)} section(s)")
 
@@ -647,7 +704,7 @@ class DocumentProcessor:
         if contact_img_path.exists():
             try:
                 run = footer_para.add_run()
-                run.add_picture(str(contact_img_path), width=Inches(3.5))
+                run.add_picture(str(contact_img_path), width=Inches(4.375))  # 3.5 * 1.25 = 25% larger
                 contact_img_added = True
                 print(f"Successfully added contact info image from: {contact_img_path}")
             except Exception as e:
@@ -800,7 +857,7 @@ class DocumentProcessor:
         if contact_img_path.exists():
             try:
                 run = footer_para.add_run()
-                run.add_picture(str(contact_img_path), width=Inches(3.5))
+                run.add_picture(str(contact_img_path), width=Inches(4.375))  # 3.5 * 1.25 = 25% larger
                 contact_img_added = True
                 print(f"Successfully added contact info image from: {contact_img_path}")
             except Exception as e:
