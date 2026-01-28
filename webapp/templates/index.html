@@ -219,13 +219,8 @@ if (uploadArea && fileInput) {
         }
     }, false);
 
-    // Click to browse
-    uploadArea.addEventListener('click', (e) => {
-        // Only trigger file input if not clicking on a button
-        if (e.target.tagName !== 'BUTTON') {
-            fileInput.click();
-        }
-    });
+    // Note: Click-to-browse works automatically via the invisible file input
+    // No additional click handler needed (avoids double file picker)
 }
 </script>
 {% endblock %}

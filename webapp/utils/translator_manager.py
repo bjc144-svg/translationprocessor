@@ -159,8 +159,8 @@ class TranslatorManager:
         return self.translators.get(name)
 
     def get_all_translators(self):
-        """Get all translators"""
-        return list(self.translators.values())
+        """Get all translators sorted alphabetically by name"""
+        return sorted(self.translators.values(), key=lambda t: t['name'])
 
     def get_translator_names(self):
         """Get list of translator names"""

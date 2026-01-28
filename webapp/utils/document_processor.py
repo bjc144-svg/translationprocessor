@@ -170,144 +170,8 @@ class DocumentProcessor:
 
             print(f"Copied margins - Top: {new_section.top_margin}, Bottom: {new_section.bottom_margin}, Left: {new_section.left_margin}, Right: {new_section.right_margin}")
 
-        # Copy all paragraphs from the original document (regardless of sections)
-        from io import BytesIO
-        from docx.oxml import parse_xml
-        from lxml import etree
-
-        # IMPORTANT: Copy body elements in order to preserve document structure
-        # This handles paragraphs, tables, and their proper sequencing
-        for element in original_doc.element.body:
-            # Check if it's a paragraph
-            if element.tag.endswith('}p'):
-                # Create corresponding paragraph in new document
-                new_para = doc.add_paragraph()
-
-                # Find the original paragraph object
-                for para in original_doc.paragraphs:
-                    if para._element == element:
-                        # Copy paragraph properties
-                        new_para.alignment = para.alignment
-                        new_para.style = para.style
-
-                        # Copy paragraph formatting
-                        if para.paragraph_format.space_before:
-                            new_para.paragraph_format.space_before = para.paragraph_format.space_before
-                        if para.paragraph_format.space_after:
-                            new_para.paragraph_format.space_after = para.paragraph_format.space_after
-                        if para.paragraph_format.line_spacing:
-                            new_para.paragraph_format.line_spacing = para.paragraph_format.line_spacing
-
-                        # Copy runs (text with formatting and images)
-                        for run in para.runs:
-                            # Check if run contains an image
-                            has_image = False
-                            drawings = run._element.findall('.//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}drawing', run._element.nsmap if hasattr(run._element, 'nsmap') else None)
-
-                            if not drawings:
-                                for child in run._element:
-                                    if 'drawing' in child.tag or 'pict' in child.tag:
-                                        drawings = [child]
-                                        break
-
-                            if drawings:
-                                has_image = True
-                                # Copy images
-                                for drawing in drawings:
-                                    try:
-                                        ns = {'a': 'http://schemas.openxmlformats.org/drawingml/2006/main',
-                                              'r': 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'}
-                                        blip = drawing.find('.//a:blip', ns)
-
-                                        if blip is None:
-                                            for elem in drawing.iter():
-                                                if 'blip' in elem.tag.lower():
-                                                    blip = elem
-                                                    break
-
-                                        if blip is not None:
-                                            rId = blip.get('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed')
-                                            if not rId:
-                                                rId = blip.get('embed')
-
-                                            if rId and rId in original_doc.part.related_parts:
-                                                image_part = original_doc.part.related_parts[rId]
-                                                image_bytes = image_part.blob
-
-                                                # Get image dimensions
-                                                extent = drawing.find('.//wp:extent', {'wp': 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing'})
-                                                if extent is None:
-                                                    for elem in drawing.iter():
-                                                        if 'extent' in elem.tag.lower():
-                                                            extent = elem
-                                                            break
-
-                                                new_run = new_para.add_run()
-                                                if extent is not None and extent.get('cx'):
-                                                    try:
-                                                        cx = int(extent.get('cx'))
-                                                        width_inches = cx / 914400.0
-                                                        new_run.add_picture(BytesIO(image_bytes), width=Inches(width_inches))
-                                                    except Exception as ex:
-                                                        print(f"Error sizing image: {ex}")
-                                                        new_run.add_picture(BytesIO(image_bytes))
-                                                else:
-                                                    new_run.add_picture(BytesIO(image_bytes))
-                                    except Exception as e:
-                                        print(f"Warning: Could not copy image: {e}")
-                                        import traceback
-                                        traceback.print_exc()
-
-                            # Copy text if no image
-                            if not has_image:
-                                new_run = new_para.add_run(run.text)
-                                new_run.bold = run.bold
-                                new_run.italic = run.italic
-                                new_run.underline = run.underline
-                                if run.font.size:
-                                    new_run.font.size = run.font.size
-                                if run.font.name:
-                                    new_run.font.name = run.font.name
-                        break
-
-            # Check if it's a table
-            elif element.tag.endswith('}tbl'):
-                # Find the original table object
-                for table in original_doc.tables:
-                    if table._element == element:
-                        # Create table with same dimensions
-                        new_table = doc.add_table(rows=len(table.rows), cols=len(table.columns))
-
-                        # Copy table style if it exists
-                        if table.style:
-                            new_table.style = table.style
-
-                        # Copy cell content and formatting
-                        for i, row in enumerate(table.rows):
-                            for j, cell in enumerate(row.cells):
-                                new_cell = new_table.rows[i].cells[j]
-
-                                # Copy each paragraph in the cell
-                                new_cell.text = ""  # Clear default paragraph
-                                for k, para in enumerate(cell.paragraphs):
-                                    if k == 0:
-                                        cell_para = new_cell.paragraphs[0]
-                                    else:
-                                        cell_para = new_cell.add_paragraph()
-
-                                    cell_para.alignment = para.alignment
-
-                                    # Copy runs with formatting
-                                    for run in para.runs:
-                                        new_run = cell_para.add_run(run.text)
-                                        new_run.bold = run.bold
-                                        new_run.italic = run.italic
-                                        new_run.underline = run.underline
-                                        if run.font.size:
-                                            new_run.font.size = run.font.size
-                                        if run.font.name:
-                                            new_run.font.name = run.font.name
-                        break
+        # Copy document body using deep copy to preserve all element types
+        self._copy_document_body(original_doc, doc)
 
         print(f"Consolidated document has {len(doc.sections)} section(s)")
 
@@ -567,6 +431,282 @@ class DocumentProcessor:
         run._r.append(instrText)
         run._r.append(fldChar2)
         run.font.size = Pt(9)
+
+    def _copy_document_body(self, source_doc, target_doc):
+        """
+        Copy all body elements from source to target document using deep copy.
+        This preserves ALL element types including paragraphs, tables, textboxes,
+        SDTs, and other complex structures that don't have python-docx API wrappers.
+        """
+        from copy import deepcopy
+        from io import BytesIO
+
+        # Track relationship ID mappings for images and embedded objects
+        rel_mapping = {}
+
+        # Statistics for logging
+        stats = {'total': 0, 'deepcopy_success': 0, 'fallback': 0, 'failed': 0}
+
+        for element in source_doc.element.body:
+            stats['total'] += 1
+            element_tag = element.tag.split('}')[-1]  # Extract tag name without namespace
+
+            try:
+                # Attempt deep copy (preserves ALL XML structure)
+                new_element = deepcopy(element)
+
+                # Reconcile relationship IDs (images, shapes, embedded objects)
+                self._reconcile_relationships(new_element, source_doc, target_doc, rel_mapping)
+
+                # Append to target document body
+                target_doc.element.body.append(new_element)
+                stats['deepcopy_success'] += 1
+                print(f"✓ Deep copied element: {element_tag}")
+
+            except Exception as e:
+                print(f"⚠ Deep copy failed for {element_tag}: {e}")
+                import traceback
+                traceback.print_exc()
+
+                # Try fallback handlers for known element types
+                if element_tag == 'p':
+                    if self._fallback_copy_paragraph(element, source_doc, target_doc):
+                        stats['fallback'] += 1
+                    else:
+                        stats['failed'] += 1
+                elif element_tag == 'tbl':
+                    if self._fallback_copy_table(element, source_doc, target_doc):
+                        stats['fallback'] += 1
+                    else:
+                        stats['failed'] += 1
+                else:
+                    # Unknown element type with no fallback
+                    print(f"✗ ERROR: No fallback handler for {element_tag}")
+                    stats['failed'] += 1
+
+        # Log final statistics
+        print(f"Body copy complete: {stats}")
+        if stats['failed'] > 0:
+            print(f"WARNING: {stats['failed']} elements could not be copied")
+
+    def _reconcile_relationships(self, element, source_doc, target_doc, rel_map):
+        """
+        Walk copied element tree and remap all relationship IDs.
+        Handles images, embedded objects, and other linked resources.
+        """
+        rel_ns = '{http://schemas.openxmlformats.org/officeDocument/2006/relationships}'
+
+        # Attributes that contain relationship IDs
+        rel_attrs = [
+            f'{rel_ns}embed',  # Embedded images/objects
+            f'{rel_ns}link',   # Linked images/objects
+            f'{rel_ns}id',     # General relationships
+        ]
+
+        # Walk all descendants of the element
+        for child in element.iter():
+            for attr in rel_attrs:
+                old_rid = child.get(attr)
+                if old_rid and old_rid in source_doc.part.related_parts:
+                    # Get or create new relationship
+                    new_rid = self._copy_relationship(old_rid, source_doc, target_doc, rel_map)
+                    # Update element to use new relationship ID
+                    child.set(attr, new_rid)
+
+    def _copy_relationship(self, old_rid, source_doc, target_doc, rel_map):
+        """
+        Copy a relationship and its associated part to target document.
+        Returns new relationship ID.
+        """
+        # Check cache first
+        if old_rid in rel_map:
+            return rel_map[old_rid]
+
+        # Get source relationship and part
+        if old_rid not in source_doc.part.related_parts:
+            print(f"Warning: Relationship {old_rid} not found in source document")
+            return old_rid  # Return unchanged
+
+        source_part = source_doc.part.related_parts[old_rid]
+        part_data = source_part.blob
+        content_type = source_part.content_type
+
+        # Handle images (most common case)
+        if 'image' in content_type:
+            try:
+                from docx.parts.image import Image
+                from docx.opc.constants import RELATIONSHIP_TYPE as RT
+
+                # Create new image part and relationship
+                image_part, rId = target_doc.part.relate_to(part_data, RT.IMAGE)
+                new_rid = rId
+
+                # Cache mapping
+                rel_map[old_rid] = new_rid
+                print(f"  Mapped image relationship: {old_rid} → {new_rid}")
+                return new_rid
+
+            except Exception as e:
+                print(f"Error copying image relationship {old_rid}: {e}")
+                return old_rid
+
+        # For other types (embedded objects, charts, etc.), return unchanged for now
+        # Can be expanded later if needed
+        print(f"Info: Relationship type '{content_type}' not fully supported, using original rId")
+        return old_rid
+
+    def _fallback_copy_paragraph(self, element, source_doc, target_doc):
+        """
+        Fallback method to copy paragraph when deep copy fails.
+        Uses the original paragraph-by-paragraph logic.
+        """
+        from io import BytesIO
+
+        try:
+            # Create corresponding paragraph in target document
+            new_para = target_doc.add_paragraph()
+
+            # Find the original paragraph object
+            for para in source_doc.paragraphs:
+                if para._element == element:
+                    # Copy paragraph properties
+                    new_para.alignment = para.alignment
+                    new_para.style = para.style
+
+                    # Copy paragraph formatting
+                    if para.paragraph_format.space_before:
+                        new_para.paragraph_format.space_before = para.paragraph_format.space_before
+                    if para.paragraph_format.space_after:
+                        new_para.paragraph_format.space_after = para.paragraph_format.space_after
+                    if para.paragraph_format.line_spacing:
+                        new_para.paragraph_format.line_spacing = para.paragraph_format.line_spacing
+
+                    # Copy runs (text with formatting and images)
+                    for run in para.runs:
+                        # Check if run contains an image
+                        has_image = False
+                        drawings = run._element.findall('.//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}drawing',
+                                                       run._element.nsmap if hasattr(run._element, 'nsmap') else None)
+
+                        if not drawings:
+                            for child in run._element:
+                                if 'drawing' in child.tag or 'pict' in child.tag:
+                                    drawings = [child]
+                                    break
+
+                        if drawings:
+                            has_image = True
+                            # Copy images
+                            for drawing in drawings:
+                                try:
+                                    ns = {'a': 'http://schemas.openxmlformats.org/drawingml/2006/main',
+                                          'r': 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'}
+                                    blip = drawing.find('.//a:blip', ns)
+
+                                    if blip is None:
+                                        for elem in drawing.iter():
+                                            if 'blip' in elem.tag.lower():
+                                                blip = elem
+                                                break
+
+                                    if blip is not None:
+                                        rId = blip.get('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed')
+                                        if not rId:
+                                            rId = blip.get('embed')
+
+                                        if rId and rId in source_doc.part.related_parts:
+                                            image_part = source_doc.part.related_parts[rId]
+                                            image_bytes = image_part.blob
+
+                                            # Get image dimensions
+                                            extent = drawing.find('.//wp:extent',
+                                                                {'wp': 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing'})
+                                            if extent is None:
+                                                for elem in drawing.iter():
+                                                    if 'extent' in elem.tag.lower():
+                                                        extent = elem
+                                                        break
+
+                                            new_run = new_para.add_run()
+                                            if extent is not None and extent.get('cx'):
+                                                try:
+                                                    cx = int(extent.get('cx'))
+                                                    width_inches = cx / 914400.0
+                                                    new_run.add_picture(BytesIO(image_bytes), width=Inches(width_inches))
+                                                except Exception as ex:
+                                                    print(f"Error sizing image: {ex}")
+                                                    new_run.add_picture(BytesIO(image_bytes))
+                                            else:
+                                                new_run.add_picture(BytesIO(image_bytes))
+                                except Exception as e:
+                                    print(f"Warning: Could not copy image in fallback: {e}")
+
+                        # Copy text if no image
+                        if not has_image:
+                            new_run = new_para.add_run(run.text)
+                            new_run.bold = run.bold
+                            new_run.italic = run.italic
+                            new_run.underline = run.underline
+                            if run.font.size:
+                                new_run.font.size = run.font.size
+                            if run.font.name:
+                                new_run.font.name = run.font.name
+                    return True  # Success
+
+            return False  # Paragraph not found
+
+        except Exception as e:
+            print(f"Fallback paragraph copy failed: {e}")
+            return False
+
+    def _fallback_copy_table(self, element, source_doc, target_doc):
+        """
+        Fallback method to copy table when deep copy fails.
+        Uses the original table-by-table logic.
+        """
+        try:
+            # Find the original table object
+            for table in source_doc.tables:
+                if table._element == element:
+                    # Create table with same dimensions
+                    new_table = target_doc.add_table(rows=len(table.rows), cols=len(table.columns))
+
+                    # Copy table style if it exists
+                    if table.style:
+                        new_table.style = table.style
+
+                    # Copy cell content and formatting
+                    for i, row in enumerate(table.rows):
+                        for j, cell in enumerate(row.cells):
+                            new_cell = new_table.rows[i].cells[j]
+
+                            # Copy each paragraph in the cell
+                            new_cell.text = ""  # Clear default paragraph
+                            for k, para in enumerate(cell.paragraphs):
+                                if k == 0:
+                                    cell_para = new_cell.paragraphs[0]
+                                else:
+                                    cell_para = new_cell.add_paragraph()
+
+                                cell_para.alignment = para.alignment
+
+                                # Copy runs with formatting
+                                for run in para.runs:
+                                    new_run = cell_para.add_run(run.text)
+                                    new_run.bold = run.bold
+                                    new_run.italic = run.italic
+                                    new_run.underline = run.underline
+                                    if run.font.size:
+                                        new_run.font.size = run.font.size
+                                    if run.font.name:
+                                        new_run.font.name = run.font.name
+                    return True  # Success
+
+            return False  # Table not found
+
+        except Exception as e:
+            print(f"Fallback table copy failed: {e}")
+            return False
 
     def create_translator_certificate(self, output_file, metadata):
         """Create translator certificate"""
