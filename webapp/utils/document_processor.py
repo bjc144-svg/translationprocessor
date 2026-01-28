@@ -478,12 +478,12 @@ class DocumentProcessor:
             stats['total'] += 1
             element_tag = element.tag.split('}')[-1]  # Extract tag name without namespace
 
-            # Skip sectPr (section properties) - we want all content in the target's existing section
-            # Copying sectPr would create additional sections and cause layout issues
-            if element_tag == 'sectPr':
-                print(f"⊘ Skipping sectPr (section properties) - using target document's section settings")
-                stats['total'] -= 1  # Don't count as processed
-                continue
+            # DON'T skip sectPr anymore - we need to preserve section structure
+            # Previously we skipped it, but now we need it to define section boundaries
+            # if element_tag == 'sectPr':
+            #     print(f"⊘ Skipping sectPr (section properties) - using target document's section settings")
+            #     stats['total'] -= 1  # Don't count as processed
+            #     continue
 
             try:
                 # Attempt deep copy (preserves ALL XML structure)
@@ -944,6 +944,8 @@ class DocumentProcessor:
         case_para.runs[0].font.size = Pt(11)
 
         doc.add_paragraph()  # Spacing
+        doc.add_paragraph()  # Additional spacing
+        doc.add_paragraph()  # Additional spacing
 
         # Footer with contact info image
         footer_para = doc.add_paragraph()
@@ -1097,6 +1099,8 @@ class DocumentProcessor:
 
         doc.add_paragraph()  # Spacing
         doc.add_paragraph()  # Spacing
+        doc.add_paragraph()  # Additional spacing
+        doc.add_paragraph()  # Additional spacing
 
         # Footer with contact info image
         footer_para = doc.add_paragraph()
