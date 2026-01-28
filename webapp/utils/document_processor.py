@@ -156,6 +156,20 @@ class DocumentProcessor:
         # Create a new document to consolidate content
         doc = Document()
 
+        # Copy margin settings from the original document
+        if original_doc.sections:
+            original_section = original_doc.sections[0]
+            new_section = doc.sections[0]
+
+            # Copy all margin settings
+            new_section.top_margin = original_section.top_margin
+            new_section.bottom_margin = original_section.bottom_margin
+            new_section.left_margin = original_section.left_margin
+            new_section.right_margin = original_section.right_margin
+            new_section.gutter = original_section.gutter
+
+            print(f"Copied margins - Top: {new_section.top_margin}, Bottom: {new_section.bottom_margin}, Left: {new_section.left_margin}, Right: {new_section.right_margin}")
+
         # Copy all paragraphs from the original document (regardless of sections)
         from io import BytesIO
         for para in original_doc.paragraphs:
@@ -381,13 +395,13 @@ class DocumentProcessor:
             pBdr.append(top)
             pPr.append(pBdr)
 
-            # Add "CERTIFIED TRANSLATION" (centered, all caps)
+            # Add "CERTIFIED TRANSLATION" (centered, all caps, not bold)
             cert_para = footer.add_paragraph("CERTIFIED TRANSLATION")
             cert_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            # Remove paragraph spacing
-            cert_para.paragraph_format.space_before = Pt(0)
+            # Reduce paragraph spacing to be tighter
+            cert_para.paragraph_format.space_before = Pt(1)
             cert_para.paragraph_format.space_after = Pt(0)
-            cert_para.runs[0].font.bold = True
+            cert_para.paragraph_format.line_spacing = 1.0
             cert_para.runs[0].font.size = Pt(12)
 
             # Add footer info table (3 columns) - span full width like header

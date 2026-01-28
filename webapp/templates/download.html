@@ -65,10 +65,20 @@
 </div>
 
 <script>
-// Auto-download immediately without dialog
+// Optional: Show a reminder to download after a few seconds
 window.addEventListener('DOMContentLoaded', function() {
-    // Trigger download automatically
-    window.location.href = "{{ url_for('download_file', filename=filename) }}";
+    setTimeout(function() {
+        const downloadBtn = document.querySelector('.btn-success');
+        if (downloadBtn) {
+            downloadBtn.style.animation = 'pulse 1s ease-in-out infinite';
+        }
+    }, 2000);
 });
 </script>
+<style>
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+</style>
 {% endblock %}
