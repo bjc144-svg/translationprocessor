@@ -534,48 +534,52 @@ class DocumentProcessor:
 
         doc.add_paragraph()  # Spacing
 
+        # Add DATE at top right
+        date_para = doc.add_paragraph()
+        date_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        run = date_para.add_run("DATE")
+        run.font.size = Pt(11)
+        run.font.bold = True
+
+        doc.add_paragraph()  # Spacing
+
         # Title
         title = doc.add_paragraph()
         title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run = title.add_run("TRANSLATOR CERTIFICATION")
+        run = title.add_run("TRANSLATION CERTIFICATION")
         run.font.size = Pt(16)
         run.font.bold = True
         run.font.all_caps = True
 
         doc.add_paragraph()  # Spacing
 
-        # Certificate text
-        cert_text = f"""I, {metadata['translator_name']}, hereby certify that I am competent to translate from {metadata['source_language']} into {metadata['target_language']}, and that the attached translation of the document is accurate and complete to the best of my knowledge and belief.
+        # Certificate text - First paragraph (justified)
+        para1_text = f"I, {metadata['translator_name']}, am fluent and competent in both the {metadata['source_language']} and {metadata['target_language']} languages. I certify that the enclosed translation is true, complete, and accurate and that, to the best of my knowledge and belief, the translation accurately reflects the meaning and intention of the original text. I am not a family member, friend, or business associate of anyone referenced in this translation but a completely disinterested third party with no relationship to the beneficiary."
 
-I further certify that I am not a party to this action and do not have a financial interest in the outcome of this matter.
-
-This certification is made in accordance with the requirements of the Federal Rules of Civil Procedure and applicable state rules.
-
-Date: {metadata['date']}
-
-Translator Name: {metadata['translator_name']}
-
-Language Pair: {metadata['language_pair']}
-
-Case Number: Park Case #{metadata['case_number']}
-"""
-
-        para = doc.add_paragraph(cert_text)
-        para.alignment = WD_ALIGN_PARAGRAPH.LEFT
-
-        for run in para.runs:
+        para1 = doc.add_paragraph(para1_text)
+        para1.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        for run in para1.runs:
             run.font.size = Pt(11)
 
         doc.add_paragraph()  # Spacing
 
-        # Signature section
-        sig_para = doc.add_paragraph("_" * 40)
-        sig_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        # Certificate text - Second paragraph (justified)
+        para2_text = "This is to certify the correctness of the translation only. I do not make any claims or guarantees about the authenticity or content of the original document."
 
-        sig_label = doc.add_paragraph(metadata['translator_name'])
-        sig_label.alignment = WD_ALIGN_PARAGRAPH.LEFT
-        sig_label.runs[0].font.size = Pt(10)
-        sig_label.runs[0].font.italic = True
+        para2 = doc.add_paragraph(para2_text)
+        para2.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        for run in para2.runs:
+            run.font.size = Pt(11)
+
+        doc.add_paragraph()  # Spacing
+        doc.add_paragraph()  # Spacing
+
+        # Add "Sincerely,"
+        sincerely = doc.add_paragraph("Sincerely,")
+        sincerely.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        sincerely.runs[0].font.size = Pt(11)
+
+        doc.add_paragraph()  # Spacing for signature
 
         # Add signature image if available
         sig_added = False
@@ -585,10 +589,10 @@ Case Number: Park Case #{metadata['case_number']}
 
             if os.path.exists(sig_path):
                 try:
-                    # Insert signature image ABOVE the line
-                    sig_img_para = doc.paragraphs[-2]  # Get the signature line paragraph
-                    run = sig_img_para.insert_paragraph_before().add_run()
+                    sig_img_para = doc.add_paragraph()
+                    run = sig_img_para.add_run()
                     run.add_picture(sig_path, width=Inches(2))
+                    sig_img_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
                     sig_added = True
                     print(f"Successfully added translator signature from: {sig_path}")
                 except Exception as e:
@@ -599,20 +603,36 @@ Case Number: Park Case #{metadata['case_number']}
                 print(f"Warning: Translator signature file not found: {sig_path}")
 
         if not sig_added:
-            # Add placeholder text if signature couldn't be loaded
-            sig_placeholder = doc.add_paragraph("[Signature image not available]")
-            sig_placeholder.alignment = WD_ALIGN_PARAGRAPH.LEFT
-            sig_placeholder.runs[0].font.size = Pt(9)
-            sig_placeholder.runs[0].font.italic = True
+            # Add placeholder for signature
+            doc.add_paragraph()  # Spacing
+
+        # Signature line
+        sig_para = doc.add_paragraph("_" * 40)
+        sig_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
+
+        # Translator name under signature line
+        sig_label = doc.add_paragraph(metadata['translator_name'])
+        sig_label.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        sig_label.runs[0].font.size = Pt(11)
 
         doc.add_paragraph()  # Spacing
         doc.add_paragraph()  # Spacing
 
-        # Footer with contact info
+        # Add CaseNumber
+        case_para = doc.add_paragraph(f"CaseNumber")
+        case_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        case_para.runs[0].font.size = Pt(11)
+
+        doc.add_paragraph()  # Spacing
+        doc.add_paragraph()  # Spacing
+        doc.add_paragraph()  # Spacing
+
+        # Footer with contact info in green
         footer_para = doc.add_paragraph()
         footer_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run = footer_para.add_run("212-581-8877 • www.parkeval.com")
-        run.font.size = Pt(10)
+        run = footer_para.add_run("(212) 581-8877 • www.ParkEval.com")
+        run.font.size = Pt(11)
+        run.font.color.rgb = RGBColor(97, 145, 43)  # #61912B green color
 
         # Save certificate
         doc.save(output_file)

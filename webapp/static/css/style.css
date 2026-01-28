@@ -6,10 +6,10 @@
 }
 
 body {
-    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif;
     line-height: 1.6;
-    color: #2c3e50;
-    background-color: #f4f6f9;
+    color: #313131;
+    background-color: #ffffff;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
@@ -24,10 +24,10 @@ body {
 
 /* Header */
 header {
-    background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+    background: linear-gradient(135deg, #4a7321 0%, #61912B 100%);
     color: white;
     padding: 1.5rem 0;
-    box-shadow: 0 2px 15px rgba(30, 58, 138, 0.2);
+    box-shadow: 0 2px 15px rgba(97, 145, 43, 0.2);
 }
 
 .header-content h1 {
@@ -68,12 +68,12 @@ main {
 .page-header {
     margin-bottom: 2rem;
     padding-bottom: 1rem;
-    border-bottom: 3px solid #3b82f6;
+    border-bottom: 3px solid #61912B;
 }
 
 .page-header h2 {
     font-size: 2rem;
-    color: #1e3a8a;
+    color: #61912B;
     margin-bottom: 0.5rem;
     font-weight: 600;
 }
@@ -176,15 +176,15 @@ main {
 }
 
 .upload-area:hover {
-    border-color: #3b82f6;
-    background-color: #eff6ff;
+    border-color: #61912B;
+    background-color: #f0f7eb;
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+    box-shadow: 0 4px 12px rgba(97, 145, 43, 0.15);
 }
 
 .upload-area.drag-over {
-    border-color: #3b82f6;
-    background-color: #dbeafe;
+    border-color: #61912B;
+    background-color: #e8f3e0;
     border-style: solid;
     transform: scale(1.02);
 }
@@ -279,8 +279,8 @@ input[type="text"]:focus,
 select:focus,
 textarea:focus {
     outline: none;
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    border-color: #61912B;
+    box-shadow: 0 0 0 3px rgba(97, 145, 43, 0.1);
 }
 
 textarea {
@@ -296,14 +296,14 @@ small {
 }
 
 small a {
-    color: #3b82f6;
+    color: #61912B;
     text-decoration: none;
     font-weight: 500;
 }
 
 small a:hover {
     text-decoration: underline;
-    color: #2563eb;
+    color: #4a7321;
 }
 
 /* Buttons */
@@ -321,13 +321,13 @@ small a:hover {
 }
 
 .btn-primary {
-    background-color: #3b82f6;
+    background-color: #61912B;
     color: white;
 }
 
 .btn-primary:hover {
-    background-color: #2563eb;
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    background-color: #4a7321;
+    box-shadow: 0 4px 12px rgba(97, 145, 43, 0.3);
 }
 
 .btn-success {
@@ -397,8 +397,8 @@ small a:hover {
 }
 
 .translator-item:hover {
-    border-color: #3b82f6;
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
+    border-color: #61912B;
+    box-shadow: 0 2px 8px rgba(97, 145, 43, 0.15);
 }
 
 .translator-info h4 {
@@ -455,8 +455,8 @@ small a:hover {
 
 /* Instructions */
 .info-card {
-    background-color: #ebf8ff;
-    border-left: 4px solid #3182ce;
+    background-color: #f0f7eb;
+    border-left: 4px solid #61912B;
 }
 
 .instructions {

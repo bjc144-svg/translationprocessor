@@ -71,7 +71,7 @@ function showLoading(message = 'Processing...') {
             ">
                 <div style="
                     border: 4px solid #f3f3f3;
-                    border-top: 4px solid #667eea;
+                    border-top: 4px solid #61912B;
                     border-radius: 50%;
                     width: 50px;
                     height: 50px;
