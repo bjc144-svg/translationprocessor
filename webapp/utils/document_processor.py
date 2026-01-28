@@ -156,6 +156,14 @@ class DocumentProcessor:
         # Create a new document to consolidate content
         doc = Document()
 
+        # Remove the initial empty paragraph that Document() creates
+        # This prevents a blank first page
+        if doc.paragraphs:
+            for para in list(doc.paragraphs):
+                # Remove empty paragraphs
+                p_element = para._element
+                p_element.getparent().remove(p_element)
+
         # Copy margin settings from the original document
         if original_doc.sections:
             original_section = original_doc.sections[0]
@@ -469,8 +477,22 @@ class DocumentProcessor:
                 # Section breaks in source document would create unwanted sections in target
                 self._remove_section_properties(new_element)
 
-                # Append to target document body
-                target_doc.element.body.append(new_element)
+                # Insert into target document body BEFORE the final sectPr
+                # Word XML always has a sectPr at the end of body
+                # Appending after it can cause ordering issues
+                # Find the final sectPr and insert before it
+                body = target_doc.element.body
+                w_ns = '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}'
+                final_sectPr = body.find(f'{w_ns}sectPr')
+
+                if final_sectPr is not None:
+                    # Insert before the final sectPr
+                    sectPr_index = list(body).index(final_sectPr)
+                    body.insert(sectPr_index, new_element)
+                else:
+                    # No sectPr found, just append (shouldn't happen)
+                    body.append(new_element)
+
                 stats['deepcopy_success'] += 1
                 print(f"✓ Deep copied element: {element_tag}")
 
