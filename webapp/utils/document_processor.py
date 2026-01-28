@@ -537,7 +537,6 @@ class DocumentProcessor:
         date_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
         run = date_para.add_run(metadata['date'])
         run.font.size = Pt(11)
-        run.font.bold = True
 
         # Title (no extra spacing before)
         title = doc.add_paragraph()
@@ -607,7 +606,7 @@ class DocumentProcessor:
         sig_label.runs[0].font.size = Pt(11)
 
         # Add actual case number
-        case_para = doc.add_paragraph(f"Park Case #{metadata['case_number']}")
+        case_para = doc.add_paragraph(f"Case Number: {metadata['case_number']}")
         case_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
         case_para.runs[0].font.size = Pt(11)
 
@@ -617,7 +616,8 @@ class DocumentProcessor:
         footer_para = doc.add_paragraph()
         footer_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
         run = footer_para.add_run("(212) 581-8877 • www.ParkEval.com")
-        run.font.size = Pt(11)
+        run.font.name = 'Arial'
+        run.font.size = Pt(13)
         run.font.color.rgb = RGBColor(97, 145, 43)  # #61912B green color
 
         # Save certificate
@@ -669,12 +669,16 @@ class DocumentProcessor:
             run.font.bold = True
             print(f"Warning: Park logo file not found at: {logo_path}")
 
-        doc.add_paragraph()  # Spacing
+        # Add DATE at top right (with actual date)
+        date_para = doc.add_paragraph()
+        date_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        run = date_para.add_run(metadata['date'])
+        run.font.size = Pt(11)
 
         # Title
         title = doc.add_paragraph()
         title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run = title.add_run("CERTIFICATION OF TRANSLATION SERVICES")
+        run = title.add_run("TRANSLATION CERTIFICATION")
         run.font.size = Pt(16)
         run.font.bold = True
         run.font.all_caps = True
@@ -682,7 +686,7 @@ class DocumentProcessor:
         doc.add_paragraph()  # Spacing
 
         # Certificate text - First paragraph (justified)
-        para1_text = f"This is to certify that the enclosed {metadata['source_language']} to {metadata['target_language']} translation (Park Case #{metadata['case_number']}) was made under my personal supervision by a qualified translator who is fluent in both languages, and that to the best of my knowledge and understanding is a true and complete rendition of the corresponding original document. This document has not been translated for a family member, friend, or business associate but by a completely disinterested third party with no relationship to the beneficiary."
+        para1_text = f"This is to certify that the enclosed {metadata['source_language']} to {metadata['target_language']} translation (Case Number: {metadata['case_number']}) was made under my personal supervision by a qualified translator who is fluent in both languages, and that to the best of my knowledge and understanding is a true and complete rendition of the corresponding original document. This document has not been translated for a family member, friend, or business associate but by a completely disinterested third party with no relationship to the beneficiary."
 
         para1 = doc.add_paragraph(para1_text)
         para1.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
@@ -705,10 +709,15 @@ class DocumentProcessor:
         sig_para = doc.add_paragraph("_" * 40)
         sig_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
-        sig_label = doc.add_paragraph("Authorized Signature - Park Evaluation Services")
-        sig_label.alignment = WD_ALIGN_PARAGRAPH.LEFT
-        sig_label.runs[0].font.size = Pt(10)
-        sig_label.runs[0].font.italic = True
+        # Name line
+        sig_name = doc.add_paragraph("Howard Borenstein")
+        sig_name.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        sig_name.runs[0].font.size = Pt(11)
+
+        # Title line
+        sig_title = doc.add_paragraph("Evaluator")
+        sig_title.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        sig_title.runs[0].font.size = Pt(11)
 
         # Add Park signature image from assets directory
         park_sig_path = self.assets_dir / 'park_signature.png'
@@ -719,8 +728,7 @@ class DocumentProcessor:
         if park_sig_path.exists():
             try:
                 # Insert signature image ABOVE the line
-                sig_img_para = doc.paragraphs[-2]  # Get the signature line paragraph
-                run = sig_img_para.insert_paragraph_before().add_run()
+                run = sig_para.insert_paragraph_before().add_run()
                 run.add_picture(str(park_sig_path), width=Inches(2))
                 sig_added = True
                 print(f"Successfully added Park signature from: {park_sig_path}")
@@ -732,20 +740,19 @@ class DocumentProcessor:
             print(f"Warning: Park signature file not found: {park_sig_path}")
 
         if not sig_added:
-            # Add placeholder text if signature couldn't be loaded
-            sig_placeholder = doc.add_paragraph("[Park signature image not available]")
-            sig_placeholder.alignment = WD_ALIGN_PARAGRAPH.LEFT
-            sig_placeholder.runs[0].font.size = Pt(9)
-            sig_placeholder.runs[0].font.italic = True
+            # Add placeholder for signature
+            doc.add_paragraph()  # Spacing
 
         doc.add_paragraph()  # Spacing
         doc.add_paragraph()  # Spacing
 
-        # Footer with contact info
+        # Footer with contact info in green
         footer_para = doc.add_paragraph()
         footer_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run = footer_para.add_run("212-581-8877 • www.parkeval.com")
-        run.font.size = Pt(10)
+        run = footer_para.add_run("(212) 581-8877 • www.ParkEval.com")
+        run.font.name = 'Arial'
+        run.font.size = Pt(13)
+        run.font.color.rgb = RGBColor(97, 145, 43)  # #61912B green color
 
         # Save certificate
         doc.save(output_file)
