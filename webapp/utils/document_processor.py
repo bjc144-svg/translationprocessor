@@ -164,6 +164,15 @@ class DocumentProcessor:
                 p_element = para._element
                 p_element.getparent().remove(p_element)
 
+        # Remove the target document's final sectPr since we'll be copying section structure from source
+        # This prevents an extra empty section at the end
+        body = doc.element.body
+        w_ns = '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}'
+        final_sectPr = body.find(f'{w_ns}sectPr')
+        if final_sectPr is not None:
+            body.remove(final_sectPr)
+            print("Removed target document's initial sectPr to prepare for source section structure")
+
         # Copy document body using deep copy to preserve all element types
         # This will preserve section breaks, allowing different pages to have different setups
         self._copy_document_body(original_doc, doc)
@@ -487,21 +496,10 @@ class DocumentProcessor:
                 # Different pages may have different sizes/orientations (e.g., A4 portrait, then A4 landscape)
                 # self._remove_section_properties(new_element)  # Commented out to preserve sections
 
-                # Insert into target document body BEFORE the final sectPr
-                # Word XML always has a sectPr at the end of body
-                # Appending after it can cause ordering issues
-                # Find the final sectPr and insert before it
-                body = target_doc.element.body
-                w_ns = '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}'
-                final_sectPr = body.find(f'{w_ns}sectPr')
-
-                if final_sectPr is not None:
-                    # Insert before the final sectPr
-                    sectPr_index = list(body).index(final_sectPr)
-                    body.insert(sectPr_index, new_element)
-                else:
-                    # No sectPr found, just append (shouldn't happen)
-                    body.append(new_element)
+                # Append to target document body
+                # We've removed the target's initial sectPr, so we can append normally
+                # Section breaks from source (sectPr elements) will create proper section structure
+                target_doc.element.body.append(new_element)
 
                 stats['deepcopy_success'] += 1
                 print(f"✓ Deep copied element: {element_tag}")
