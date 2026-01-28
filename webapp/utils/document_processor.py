@@ -146,7 +146,99 @@ class DocumentProcessor:
         """Add header and footer to translation document"""
 
         # Open document
-        doc = Document(input_file)
+        original_doc = Document(input_file)
+
+        # IMPORTANT: Create a new document with a single section to ensure correct page numbering
+        # If the document has multiple sections, SECTIONPAGES will only count pages in each individual section
+        # By creating a new document with all content in one section, SECTIONPAGES will count all pages
+        print(f"Original document has {len(original_doc.sections)} section(s)")
+
+        # Create a new document to consolidate content
+        doc = Document()
+
+        # Copy all paragraphs from the original document (regardless of sections)
+        from io import BytesIO
+        for para in original_doc.paragraphs:
+            new_para = doc.add_paragraph()
+            new_para.alignment = para.alignment
+            new_para.style = para.style
+
+            # Copy runs (text with formatting and images)
+            for run in para.runs:
+                # Check if run contains an image
+                has_image = False
+                drawings = run._element.findall('.//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}drawing', run._element.nsmap if hasattr(run._element, 'nsmap') else None)
+
+                if not drawings:
+                    for child in run._element:
+                        if 'drawing' in child.tag or 'pict' in child.tag:
+                            drawings = [child]
+                            break
+
+                if drawings:
+                    has_image = True
+                    # Copy images
+                    for drawing in drawings:
+                        try:
+                            ns = {'a': 'http://schemas.openxmlformats.org/drawingml/2006/main',
+                                  'r': 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'}
+                            blip = drawing.find('.//a:blip', ns)
+
+                            if blip is None:
+                                for elem in drawing.iter():
+                                    if 'blip' in elem.tag.lower():
+                                        blip = elem
+                                        break
+
+                            if blip is not None:
+                                rId = blip.get('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed')
+                                if not rId:
+                                    rId = blip.get('embed')
+
+                                if rId and rId in original_doc.part.related_parts:
+                                    image_part = original_doc.part.related_parts[rId]
+                                    image_bytes = image_part.blob
+
+                                    # Get image dimensions
+                                    extent = drawing.find('.//wp:extent', {'wp': 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing'})
+                                    if extent is None:
+                                        for elem in drawing.iter():
+                                            if 'extent' in elem.tag.lower():
+                                                extent = elem
+                                                break
+
+                                    new_run = new_para.add_run()
+                                    if extent is not None and extent.get('cx'):
+                                        try:
+                                            cx = int(extent.get('cx'))
+                                            width_inches = cx / 914400.0
+                                            new_run.add_picture(BytesIO(image_bytes), width=Inches(width_inches))
+                                        except:
+                                            new_run.add_picture(BytesIO(image_bytes))
+                                    else:
+                                        new_run.add_picture(BytesIO(image_bytes))
+                        except Exception as e:
+                            print(f"Warning: Could not copy image: {e}")
+
+                # Copy text if no image
+                if not has_image:
+                    new_run = new_para.add_run(run.text)
+                    new_run.bold = run.bold
+                    new_run.italic = run.italic
+                    new_run.underline = run.underline
+                    if run.font.size:
+                        new_run.font.size = run.font.size
+                    if run.font.name:
+                        new_run.font.name = run.font.name
+
+        # Copy tables from the original document
+        for table in original_doc.tables:
+            new_table = doc.add_table(rows=len(table.rows), cols=len(table.columns))
+            for i, row in enumerate(table.rows):
+                for j, cell in enumerate(row.cells):
+                    new_table.rows[i].cells[j].text = cell.text
+
+        print(f"Consolidated document has {len(doc.sections)} section(s)")
 
         # Apply header/footer to ALL sections
         for section in doc.sections:
