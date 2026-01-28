@@ -256,6 +256,10 @@ class DocumentProcessor:
 
         # Apply header/footer to ALL sections
         for section in doc.sections:
+            # Reduce header distance from top of page
+            section.header_distance = Inches(0.25)  # Closer to top
+            section.footer_distance = Inches(0.25)  # Closer to bottom
+
             # Set up header
             header = section.header
             header.is_linked_to_previous = False
@@ -398,8 +402,8 @@ class DocumentProcessor:
             # Add "CERTIFIED TRANSLATION" (centered, all caps, not bold)
             cert_para = footer.add_paragraph("CERTIFIED TRANSLATION")
             cert_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            # Reduce paragraph spacing to be tighter
-            cert_para.paragraph_format.space_before = Pt(1)
+            # Make spacing extremely tight
+            cert_para.paragraph_format.space_before = Pt(0)
             cert_para.paragraph_format.space_after = Pt(0)
             cert_para.paragraph_format.line_spacing = 1.0
             cert_para.runs[0].font.size = Pt(12)
@@ -433,12 +437,16 @@ class DocumentProcessor:
             left_para = left_cell.paragraphs[0]
             left_para.text = f"Park Case #{metadata['case_number']}"
             left_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            left_para.paragraph_format.space_before = Pt(0)
+            left_para.paragraph_format.space_after = Pt(0)
             left_para.runs[0].font.size = Pt(9)
 
             # Center - Page number with field codes
             center_cell = footer_table.rows[0].cells[1]
             center_para = center_cell.paragraphs[0]
             center_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            center_para.paragraph_format.space_before = Pt(0)
+            center_para.paragraph_format.space_after = Pt(0)
 
             # Add "Page " text
             run = center_para.add_run("Page ")
@@ -459,6 +467,8 @@ class DocumentProcessor:
             right_para = right_cell.paragraphs[0]
             right_para.text = metadata['language_pair']
             right_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            right_para.paragraph_format.space_before = Pt(0)
+            right_para.paragraph_format.space_after = Pt(0)
             right_para.runs[0].font.size = Pt(9)
 
         # Save document
@@ -626,13 +636,32 @@ class DocumentProcessor:
 
         doc.add_paragraph()  # Spacing
 
-        # Footer with contact info in green
+        # Footer with contact info image
         footer_para = doc.add_paragraph()
         footer_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run = footer_para.add_run("(212) 581-8877 • www.ParkEval.com")
-        run.font.name = 'Arial'
-        run.font.size = Pt(13)
-        run.font.color.rgb = RGBColor(97, 145, 43)  # #61912B green color
+
+        # Try to add contact info image
+        contact_img_path = self.assets_dir / 'park_contact.png'
+        contact_img_added = False
+
+        if contact_img_path.exists():
+            try:
+                run = footer_para.add_run()
+                run.add_picture(str(contact_img_path), width=Inches(3.5))
+                contact_img_added = True
+                print(f"Successfully added contact info image from: {contact_img_path}")
+            except Exception as e:
+                print(f"Error adding contact info image: {e}")
+                import traceback
+                traceback.print_exc()
+
+        # Fallback to text if image not available
+        if not contact_img_added:
+            run = footer_para.add_run("(212) 581-8877 • www.ParkEval.com")
+            run.font.name = 'Arial'
+            run.font.size = Pt(13)
+            run.font.color.rgb = RGBColor(97, 145, 43)
+            print(f"Warning: Contact info image not found at: {contact_img_path}")
 
         # Save certificate
         doc.save(output_file)
@@ -760,13 +789,32 @@ class DocumentProcessor:
         doc.add_paragraph()  # Spacing
         doc.add_paragraph()  # Spacing
 
-        # Footer with contact info in green
+        # Footer with contact info image
         footer_para = doc.add_paragraph()
         footer_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run = footer_para.add_run("(212) 581-8877 • www.ParkEval.com")
-        run.font.name = 'Arial'
-        run.font.size = Pt(13)
-        run.font.color.rgb = RGBColor(97, 145, 43)  # #61912B green color
+
+        # Try to add contact info image
+        contact_img_path = self.assets_dir / 'park_contact.png'
+        contact_img_added = False
+
+        if contact_img_path.exists():
+            try:
+                run = footer_para.add_run()
+                run.add_picture(str(contact_img_path), width=Inches(3.5))
+                contact_img_added = True
+                print(f"Successfully added contact info image from: {contact_img_path}")
+            except Exception as e:
+                print(f"Error adding contact info image: {e}")
+                import traceback
+                traceback.print_exc()
+
+        # Fallback to text if image not available
+        if not contact_img_added:
+            run = footer_para.add_run("(212) 581-8877 • www.ParkEval.com")
+            run.font.name = 'Arial'
+            run.font.size = Pt(13)
+            run.font.color.rgb = RGBColor(97, 145, 43)
+            print(f"Warning: Contact info image not found at: {contact_img_path}")
 
         # Save certificate
         doc.save(output_file)
