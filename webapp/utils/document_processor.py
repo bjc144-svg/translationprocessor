@@ -164,30 +164,34 @@ class DocumentProcessor:
                 p_element = para._element
                 p_element.getparent().remove(p_element)
 
-        # Copy margin settings from the original document
-        if original_doc.sections:
-            original_section = original_doc.sections[0]
-            new_section = doc.sections[0]
-
-            # Copy all margin settings
-            new_section.top_margin = original_section.top_margin
-            new_section.bottom_margin = original_section.bottom_margin
-            new_section.left_margin = original_section.left_margin
-            new_section.right_margin = original_section.right_margin
-            new_section.gutter = original_section.gutter
-
-            # Copy page size and orientation
-            new_section.page_height = original_section.page_height
-            new_section.page_width = original_section.page_width
-            new_section.orientation = original_section.orientation
-
-            print(f"Copied margins - Top: {new_section.top_margin}, Bottom: {new_section.bottom_margin}, Left: {new_section.left_margin}, Right: {new_section.right_margin}")
-            print(f"Copied page size - Height: {new_section.page_height}, Width: {new_section.page_width}, Orientation: {new_section.orientation}")
-
         # Copy document body using deep copy to preserve all element types
+        # This will preserve section breaks, allowing different pages to have different setups
         self._copy_document_body(original_doc, doc)
 
-        print(f"Consolidated document has {len(doc.sections)} section(s)")
+        print(f"Original document had {len(original_doc.sections)} section(s)")
+        print(f"Target document now has {len(doc.sections)} section(s)")
+
+        # Copy page setup (margins, size, orientation) from each source section to corresponding target section
+        for idx, target_section in enumerate(doc.sections):
+            if idx < len(original_doc.sections):
+                source_section = original_doc.sections[idx]
+
+                # Copy all margin settings
+                target_section.top_margin = source_section.top_margin
+                target_section.bottom_margin = source_section.bottom_margin
+                target_section.left_margin = source_section.left_margin
+                target_section.right_margin = source_section.right_margin
+                target_section.gutter = source_section.gutter
+
+                # Copy page size and orientation
+                target_section.page_height = source_section.page_height
+                target_section.page_width = source_section.page_width
+                target_section.orientation = source_section.orientation
+
+                print(f"Section {idx}: Copied page setup - Height: {target_section.page_height}, Width: {target_section.page_width}, Orientation: {target_section.orientation}")
+            else:
+                # More target sections than source sections (shouldn't happen, but handle gracefully)
+                print(f"Warning: Target section {idx} has no corresponding source section")
 
         # Apply header/footer to ALL sections
         for section in doc.sections:
@@ -479,9 +483,9 @@ class DocumentProcessor:
                 # Reconcile relationship IDs (images, shapes, embedded objects)
                 self._reconcile_relationships(new_element, source_doc, target_doc, rel_mapping)
 
-                # Remove section properties from within paragraph properties
-                # Section breaks in source document would create unwanted sections in target
-                self._remove_section_properties(new_element)
+                # DON'T remove section properties - we need to preserve them for different page setups
+                # Different pages may have different sizes/orientations (e.g., A4 portrait, then A4 landscape)
+                # self._remove_section_properties(new_element)  # Commented out to preserve sections
 
                 # Insert into target document body BEFORE the final sectPr
                 # Word XML always has a sectPr at the end of body
