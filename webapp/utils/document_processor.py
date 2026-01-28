@@ -511,6 +511,9 @@ class DocumentProcessor:
         ]
 
         # Walk all descendants of the element
+        # We need to collect elements to remove so we don't modify while iterating
+        elements_to_remove = []
+
         for child in element.iter():
             for attr in rel_attrs:
                 old_rid = child.get(attr)
@@ -519,12 +522,23 @@ class DocumentProcessor:
                     new_rid = self._copy_relationship(old_rid, source_doc, target_doc, rel_map)
 
                     if new_rid is None:
-                        # Remove the relationship reference (unsupported type or header/footer)
-                        if attr in child.attrib:
-                            del child.attrib[attr]
+                        # For headerReference and footerReference elements, remove the entire element
+                        # Just deleting the r:id attribute leaves an invalid element
+                        tag_name = child.tag.split('}')[-1] if '}' in child.tag else child.tag
+                        if tag_name in ('headerReference', 'footerReference'):
+                            elements_to_remove.append((child.getparent(), child))
+                        else:
+                            # For other elements, just delete the attribute
+                            if attr in child.attrib:
+                                del child.attrib[attr]
                     else:
                         # Update element to use new relationship ID
                         child.set(attr, new_rid)
+
+        # Remove collected elements
+        for parent, child in elements_to_remove:
+            if parent is not None:
+                parent.remove(child)
 
     def _copy_relationship(self, old_rid, source_doc, target_doc, rel_map):
         """
@@ -548,20 +562,36 @@ class DocumentProcessor:
         if 'image' in content_type:
             try:
                 from io import BytesIO
-                from docx.opc.constants import RELATIONSHIP_TYPE as RT
-                from docx.parts.image import ImagePart
 
-                # Create new image part and add it to the package
+                # Use the high-level API to add the image (which handles all the complexity)
+                # Create a temporary paragraph, add picture to it, extract the rId, then delete it
+                temp_para = target_doc.add_paragraph()
+                temp_run = temp_para.add_run()
+
+                # Add the picture using the proven working API
                 image_stream = BytesIO(part_data)
-                image_part = ImagePart.new(target_doc.part.package, image_stream)
+                temp_run.add_picture(image_stream)
 
-                # Create relationship from document to image part
-                new_rid = target_doc.part.relate_to(image_part, RT.IMAGE)
+                # Extract the relationship ID that was just created
+                # The picture element contains the relationship reference
+                pic_elements = temp_run._element.findall('.//{http://schemas.openxmlformats.org/drawingml/2006/picture}pic')
+                if pic_elements:
+                    blip = pic_elements[0].find('.//{http://schemas.openxmlformats.org/drawingml/2006/main}blip')
+                    if blip is not None:
+                        new_rid = blip.get('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed')
 
-                # Cache mapping
-                rel_map[old_rid] = new_rid
-                print(f"  Mapped image relationship: {old_rid} → {new_rid}")
-                return new_rid
+                        # Delete the temporary paragraph
+                        target_doc._element.body.remove(temp_para._element)
+
+                        # Cache mapping
+                        rel_map[old_rid] = new_rid
+                        print(f"  Mapped image relationship: {old_rid} → {new_rid}")
+                        return new_rid
+
+                # If we couldn't extract the rId, delete temp paragraph and return None
+                target_doc._element.body.remove(temp_para._element)
+                print(f"Warning: Could not extract relationship ID for image {old_rid}")
+                return None
 
             except Exception as e:
                 print(f"Error copying image relationship {old_rid}: {e}")
