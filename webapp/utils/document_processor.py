@@ -534,12 +534,12 @@ class DocumentProcessor:
         # Handle images (most common case)
         if 'image' in content_type:
             try:
-                from docx.parts.image import Image
-                from docx.opc.constants import RELATIONSHIP_TYPE as RT
+                from io import BytesIO
 
-                # Create new image part and relationship
-                image_part, rId = target_doc.part.relate_to(part_data, RT.IMAGE)
-                new_rid = rId
+                # Create new image part using get_or_add_image_part
+                # This properly creates an ImagePart object and adds it to the package
+                image_stream = BytesIO(part_data)
+                image_part, new_rid = target_doc.part.get_or_add_image_part(image_stream)
 
                 # Cache mapping
                 rel_map[old_rid] = new_rid
@@ -548,6 +548,8 @@ class DocumentProcessor:
 
             except Exception as e:
                 print(f"Error copying image relationship {old_rid}: {e}")
+                import traceback
+                traceback.print_exc()
                 return old_rid
 
         # For other types (embedded objects, charts, etc.), return unchanged for now
