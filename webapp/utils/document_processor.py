@@ -192,7 +192,7 @@ class DocumentProcessor:
 
         if section_1_start_idx is not None:
             print(f"SOURCE: Section 1 starts at element index {section_1_start_idx}")
-            print("SOURCE: First 5 paragraphs of Section 1:")
+            print("SOURCE: All paragraphs in Section 1 (showing only those with images or text):")
             para_count = 0
             drawing_ns = '{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}'
             pic_ns = '{http://schemas.openxmlformats.org/drawingml/2006/picture}'
@@ -213,20 +213,26 @@ class DocumentProcessor:
 
                         total = len(drawings) + len(pics) + len(vml_shapes) + len(pict_elements)
                         has_images = total > 0
-                        image_info = f" [HAS {len(drawings)} drawings, {len(pics)} pics, {len(vml_shapes)} VML, {len(pict_elements)} pict]" if has_images else " [NO IMAGES]"
+                        has_text = len(text) > 0
 
-                        print(f"  SOURCE Para {para_count}: text_len={len(text)}{image_info}")
+                        # Only print paragraphs with images or text (skip empty ones)
+                        if has_images or has_text:
+                            image_info = f" [HAS {len(drawings)} drawings, {len(pics)} pics, {len(vml_shapes)} VML, {len(pict_elements)} pict]" if has_images else " [NO IMAGES]"
+                            print(f"  SOURCE Para {para_count}: text_len={len(text)}{image_info}")
 
-                        # If this paragraph has VML shapes, check their positioning
-                        if len(vml_shapes) > 0:
-                            print(f"    SOURCE VML positioning for Para {para_count}:")
-                            for vml_idx, vml_shape in enumerate(vml_shapes):
-                                style = vml_shape.get('style')
-                                print(f"      VML {vml_idx}: style='{style}'")
+                            # If this paragraph has VML shapes, check their positioning
+                            if len(vml_shapes) > 0:
+                                print(f"    SOURCE VML positioning for Para {para_count}:")
+                                for vml_idx, vml_shape in enumerate(vml_shapes):
+                                    style = vml_shape.get('style')
+                                    print(f"      VML {vml_idx}: style='{style}'")
 
                         para_count += 1
-                        if para_count >= 5:
-                            break
+                    elif tag == 'sectPr':
+                        # Reached end of Section 1
+                        break
+
+            print(f"  SOURCE: Total {para_count} paragraphs in Section 1")
 
         print("=" * 60 + "\n")
 
