@@ -174,6 +174,46 @@ class DocumentProcessor:
 
         print(f"SOURCE: Total body elements: {len(source_elements)}")
         print(f"SOURCE: Element types: {', '.join(set(source_elements))}")
+
+        # Check SOURCE Section 1 paragraphs for drawings
+        print("\nDEBUG: Checking SOURCE Section 1 for images/drawings...")
+        section_1_start_idx = None
+        current_section_idx = 0
+
+        for elem_idx, element in enumerate(original_doc.element.body):
+            tag = element.tag.split('}')[-1] if '}' in element.tag else element.tag
+            if tag == 'p':
+                pPr = element.find(f'{w_ns}pPr')
+                if pPr is not None and pPr.find(f'{w_ns}sectPr') is not None:
+                    current_section_idx += 1
+                    if current_section_idx == 1:
+                        section_1_start_idx = elem_idx + 1
+                        break
+
+        if section_1_start_idx is not None:
+            print(f"SOURCE: Section 1 starts at element index {section_1_start_idx}")
+            print("SOURCE: First 5 paragraphs of Section 1:")
+            para_count = 0
+            for elem_idx, element in enumerate(original_doc.element.body):
+                if elem_idx >= section_1_start_idx:
+                    tag = element.tag.split('}')[-1] if '}' in element.tag else element.tag
+                    if tag == 'p':
+                        drawing_ns = '{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}'
+                        pic_ns = '{http://schemas.openxmlformats.org/drawingml/2006/picture}'
+                        drawings = element.findall(f'.//{drawing_ns}inline') + element.findall(f'.//{drawing_ns}anchor')
+                        pics = element.findall(f'.//{pic_ns}pic')
+
+                        text_nodes = element.findall(f'.//{w_ns}t')
+                        text = ''.join([t.text or '' for t in text_nodes])
+
+                        has_images = len(drawings) > 0 or len(pics) > 0
+                        image_info = f" [HAS {len(drawings)} drawings, {len(pics)} pics]" if has_images else " [NO IMAGES]"
+
+                        print(f"  SOURCE Para {para_count}: text_len={len(text)}{image_info}")
+                        para_count += 1
+                        if para_count >= 5:
+                            break
+
         print("=" * 60 + "\n")
 
         # Create a new document to consolidate content
