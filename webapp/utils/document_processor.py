@@ -216,6 +216,14 @@ class DocumentProcessor:
                         image_info = f" [HAS {len(drawings)} drawings, {len(pics)} pics, {len(vml_shapes)} VML, {len(pict_elements)} pict]" if has_images else " [NO IMAGES]"
 
                         print(f"  SOURCE Para {para_count}: text_len={len(text)}{image_info}")
+
+                        # If this paragraph has VML shapes, check their positioning
+                        if len(vml_shapes) > 0:
+                            print(f"    SOURCE VML positioning for Para {para_count}:")
+                            for vml_idx, vml_shape in enumerate(vml_shapes):
+                                style = vml_shape.get('style')
+                                print(f"      VML {vml_idx}: style='{style}'")
+
                         para_count += 1
                         if para_count >= 5:
                             break
@@ -917,19 +925,45 @@ class DocumentProcessor:
     def _add_num_pages(self, paragraph):
         """Add formula field to calculate NUMPAGES - 2 (excludes 2 certificate pages)"""
         run = paragraph.add_run()
-        fldChar1 = OxmlElement('w:fldChar')
-        fldChar1.set(qn('w:fldCharType'), 'begin')
 
-        instrText = OxmlElement('w:instrText')
-        instrText.set(qn('xml:space'), 'preserve')
-        instrText.text = '= NUMPAGES - 2'
+        # Begin formula field
+        fldChar_formula_begin = OxmlElement('w:fldChar')
+        fldChar_formula_begin.set(qn('w:fldCharType'), 'begin')
+        run._r.append(fldChar_formula_begin)
 
-        fldChar2 = OxmlElement('w:fldChar')
-        fldChar2.set(qn('w:fldCharType'), 'end')
+        # Formula instruction start: "= "
+        instrText_formula_start = OxmlElement('w:instrText')
+        instrText_formula_start.set(qn('xml:space'), 'preserve')
+        instrText_formula_start.text = '= '
+        run._r.append(instrText_formula_start)
 
-        run._r.append(fldChar1)
-        run._r.append(instrText)
-        run._r.append(fldChar2)
+        # Begin nested NUMPAGES field
+        fldChar_numpages_begin = OxmlElement('w:fldChar')
+        fldChar_numpages_begin.set(qn('w:fldCharType'), 'begin')
+        run._r.append(fldChar_numpages_begin)
+
+        # NUMPAGES instruction
+        instrText_numpages = OxmlElement('w:instrText')
+        instrText_numpages.set(qn('xml:space'), 'preserve')
+        instrText_numpages.text = 'NUMPAGES'
+        run._r.append(instrText_numpages)
+
+        # End nested NUMPAGES field
+        fldChar_numpages_end = OxmlElement('w:fldChar')
+        fldChar_numpages_end.set(qn('w:fldCharType'), 'end')
+        run._r.append(fldChar_numpages_end)
+
+        # Formula instruction end: " - 2"
+        instrText_formula_end = OxmlElement('w:instrText')
+        instrText_formula_end.set(qn('xml:space'), 'preserve')
+        instrText_formula_end.text = ' - 2'
+        run._r.append(instrText_formula_end)
+
+        # End formula field
+        fldChar_formula_end = OxmlElement('w:fldChar')
+        fldChar_formula_end.set(qn('w:fldCharType'), 'end')
+        run._r.append(fldChar_formula_end)
+
         run.font.size = Pt(9)
 
     def _copy_document_body(self, source_doc, target_doc):
