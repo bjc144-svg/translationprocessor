@@ -366,6 +366,56 @@ class DocumentProcessor:
                 else:
                     print(f"    No rows with cantSplit property")
 
+        # Debug: Check Section 0's paragraphs after the table
+        print("\nDEBUG: Analyzing Section 0 paragraphs after the table...")
+        drawing_ns = '{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}'
+        pic_ns = '{http://schemas.openxmlformats.org/drawingml/2006/picture}'
+        vml_ns = 'urn:schemas-microsoft-com:vml'
+
+        section_0_para_count = 0
+        for elem_idx, element in enumerate(doc.element.body):
+            tag = element.tag.split('}')[-1] if '}' in element.tag else element.tag
+
+            if tag == 'p':
+                # Check if this ends Section 0
+                pPr = element.find(f'{w_ns}pPr')
+                if pPr is not None and pPr.find(f'{w_ns}sectPr') is not None:
+                    print(f"  Para {section_0_para_count} (ENDS SECTION 0)")
+                    break
+
+                # Only analyze paragraphs after the table (after element 0)
+                if elem_idx > 0 and section_0_para_count < 10:  # Print first 10 paras after table
+                    # Get text content
+                    text_nodes = element.findall(f'.//{w_ns}t')
+                    text = ''.join([t.text or '' for t in text_nodes])
+
+                    # Check for images (all formats)
+                    drawings = element.findall(f'.//{drawing_ns}inline') + element.findall(f'.//{drawing_ns}anchor')
+                    pics = element.findall(f'.//{pic_ns}pic')
+                    vml_shapes = element.findall(f'.//{{{vml_ns}}}shape') + element.findall(f'.//{{{vml_ns}}}imagedata')
+                    pict_elements = element.findall(f'.//{w_ns}pict')
+
+                    total = len(drawings) + len(pics) + len(vml_shapes) + len(pict_elements)
+                    has_images = total > 0
+                    image_info = f" [HAS {total} images]" if has_images else " [NO IMAGES]"
+
+                    # Check for pageBreakBefore
+                    page_break_before = False
+                    if pPr is not None:
+                        if pPr.find(f'{w_ns}pageBreakBefore') is not None:
+                            page_break_before = True
+
+                    pb_info = " [PAGE BREAK BEFORE!]" if page_break_before else ""
+
+                    print(f"  Para {section_0_para_count}: text_len={len(text)}{image_info}{pb_info}")
+
+                section_0_para_count += 1
+            elif tag == 'tbl':
+                # Skip the table
+                pass
+
+        print(f"  Total: {section_0_para_count} paragraphs in Section 0 (after table)")
+
         # Debug: Check actual text content in Section 1 paragraphs
         print("\nDEBUG: Analyzing Section 1 paragraph content...")
         section_1_start_idx = None
