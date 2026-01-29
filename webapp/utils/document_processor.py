@@ -263,24 +263,25 @@ class DocumentProcessor:
         print(f"Original document had {len(original_doc.sections)} section(s)")
         print(f"Target document now has {len(doc.sections)} section(s)")
 
-        # Remove truly empty paragraphs (no text, no images, not section-ending)
-        # These can create unwanted blank space
-        print("\nRemoving empty paragraphs to prevent blank pages...")
+        # Remove only TRAILING empty paragraphs (those at end of sections with no content after)
+        # Preserve empty paragraphs BETWEEN content paragraphs to maintain spacing
+        print("\nRemoving trailing empty paragraphs to prevent blank pages...")
         w_ns = '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}'
         drawing_ns = '{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}'
         pic_ns = '{http://schemas.openxmlformats.org/drawingml/2006/picture}'
         vml_ns = 'urn:schemas-microsoft-com:vml'
 
-        paragraphs_to_remove = []
-        for elem_idx, element in enumerate(doc.element.body):
+        # First pass: identify which paragraphs have content
+        elements_list = list(doc.element.body)
+        has_content_map = {}  # element -> bool
+
+        for elem_idx, element in enumerate(elements_list):
             tag = element.tag.split('}')[-1] if '}' in element.tag else element.tag
 
             if tag == 'p':
                 # Check if this paragraph ends a section (contains sectPr)
                 pPr = element.find(f'{w_ns}pPr')
-                if pPr is not None and pPr.find(f'{w_ns}sectPr') is not None:
-                    # Don't remove section-ending paragraphs
-                    continue
+                is_section_end = pPr is not None and pPr.find(f'{w_ns}sectPr') is not None
 
                 # Check for text content
                 text_nodes = element.findall(f'.//{w_ns}t')
@@ -293,15 +294,50 @@ class DocumentProcessor:
                 pict_elements = element.findall(f'.//{w_ns}pict')
 
                 has_content = len(text) > 0 or len(drawings) > 0 or len(pics) > 0 or len(vml_shapes) > 0 or len(pict_elements) > 0
+                has_content_map[elem_idx] = (has_content, is_section_end)
 
+        # Second pass: identify trailing empty paragraphs (no content after them in same section)
+        paragraphs_to_remove = []
+        for elem_idx, element in enumerate(elements_list):
+            tag = element.tag.split('}')[-1] if '}' in element.tag else element.tag
+
+            if tag == 'p' and elem_idx in has_content_map:
+                has_content, is_section_end = has_content_map[elem_idx]
+
+                # Don't remove section-ending paragraphs
+                if is_section_end:
+                    continue
+
+                # If this paragraph has no content, check if there's any content after it
                 if not has_content:
-                    paragraphs_to_remove.append(element)
+                    has_content_after = False
+                    for future_idx in range(elem_idx + 1, len(elements_list)):
+                        future_elem = elements_list[future_idx]
+                        future_tag = future_elem.tag.split('}')[-1] if '}' in future_elem.tag else future_elem.tag
 
-        # Remove the empty paragraphs
+                        # Stop at section boundary
+                        if future_tag == 'p' and future_idx in has_content_map:
+                            future_has_content, future_is_section_end = has_content_map[future_idx]
+                            if future_is_section_end:
+                                # Reached section end, no more content possible
+                                break
+                            if future_has_content:
+                                # Found content after this empty paragraph
+                                has_content_after = True
+                                break
+                        elif future_tag == 'sectPr':
+                            # Reached end of document
+                            break
+
+                    # Only remove if this is a trailing empty (no content after it)
+                    if not has_content_after:
+                        paragraphs_to_remove.append(element)
+
+        # Remove the trailing empty paragraphs
         for para_element in paragraphs_to_remove:
             para_element.getparent().remove(para_element)
 
-        print(f"Removed {len(paragraphs_to_remove)} empty paragraphs")
+        print(f"Removed {len(paragraphs_to_remove)} trailing empty paragraphs (preserved spacing between content)")
 
         # Debug: Check content distribution across sections
         print("=" * 60)
