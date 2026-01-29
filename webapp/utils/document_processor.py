@@ -479,7 +479,10 @@ class DocumentProcessor:
         # Also save a copy to the output folder for inspection
         import shutil
         from pathlib import Path
-        output_folder = Path(output_file).parent.parent / "output"
+        # Get the webapp output directory
+        webapp_dir = Path(__file__).parent.parent
+        output_folder = webapp_dir / "output"
+        output_folder.mkdir(parents=True, exist_ok=True)
         debug_copy = output_folder / "DEBUG_translation_with_header.docx"
         try:
             shutil.copy2(output_file, debug_copy)
