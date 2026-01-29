@@ -690,10 +690,17 @@ class DocumentProcessor:
                 target_section.page_width = source_section.page_width
                 target_section.orientation = source_section.orientation
 
+                # IMPORTANT: Remove multi-column settings - force single column
+                # Multi-column layouts from source document can cause content to appear on wrong side
+                sectPr = target_section._sectPr
+                cols_elem = sectPr.find(qn('w:cols'))
+                if cols_elem is not None:
+                    print(f"Section {idx}: Removing multi-column layout from source")
+                    sectPr.remove(cols_elem)
+
                 # Check and fix section break type
                 # Section breaks can be: nextPage, evenPage, oddPage, continuous
                 # If set to evenPage or oddPage, it can cause blank pages
-                sectPr = target_section._sectPr
                 type_elem = sectPr.find(qn('w:type'))
                 if type_elem is not None:
                     current_type = type_elem.get(qn('w:val'))
@@ -1722,6 +1729,13 @@ class DocumentProcessor:
             new_section.page_height = Inches(11)  # Letter height
             new_section.page_width = Inches(8.5)  # Letter width
             new_section.orientation = 0  # 0 = Portrait, 1 = Landscape
+
+            # Force single column layout for certificates
+            # Remove any multi-column settings that might be inherited
+            sectPr = new_section._sectPr
+            cols_elem = sectPr.find(qn('w:cols'))
+            if cols_elem is not None:
+                sectPr.remove(cols_elem)
 
             # Make sure this section doesn't inherit header/footer from previous section
             new_section.header.is_linked_to_previous = False
