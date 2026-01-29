@@ -183,28 +183,39 @@ class DocumentProcessor:
         # Debug: Check content distribution across sections
         print("=" * 60)
         print("SECTION CONTENT ANALYSIS:")
-        for idx in range(len(doc.sections)):
-            # Count elements that belong to this section
-            # This is approximate - we're just counting paragraphs and tables
-            if idx == 0:
-                # First section - count from start
-                section_para_count = 0
-                section_table_count = 0
-                for element in doc.element.body:
-                    tag = element.tag.split('}')[-1] if '}' in element.tag else element.tag
-                    if tag == 'p':
-                        # Check if this paragraph has sectPr (marks end of section)
-                        w_ns = '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}'
-                        pPr = element.find(f'{w_ns}pPr')
-                        if pPr is not None and pPr.find(f'{w_ns}sectPr') is not None:
-                            section_para_count += 1
-                            break  # This marks the end of the section
-                        section_para_count += 1
-                    elif tag == 'tbl':
-                        section_table_count += 1
-                print(f"  Section {idx}: {section_para_count} paragraphs, {section_table_count} tables")
-            else:
-                print(f"  Section {idx}: (content counting across sections not fully implemented)")
+
+        w_ns = '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}'
+
+        # Track content per section
+        section_contents = []  # List of dicts: {'paragraphs': count, 'tables': count}
+        current_section = {'paragraphs': 0, 'tables': 0}
+
+        for element in doc.element.body:
+            tag = element.tag.split('}')[-1] if '}' in element.tag else element.tag
+
+            if tag == 'p':
+                current_section['paragraphs'] += 1
+                # Check if this paragraph has sectPr (marks end of this section)
+                pPr = element.find(f'{w_ns}pPr')
+                if pPr is not None and pPr.find(f'{w_ns}sectPr') is not None:
+                    # This paragraph ends the current section
+                    section_contents.append(current_section)
+                    current_section = {'paragraphs': 0, 'tables': 0}
+                    print(f"  Found section break in paragraph (ends Section {len(section_contents) - 1})")
+            elif tag == 'tbl':
+                current_section['tables'] += 1
+            elif tag == 'sectPr':
+                # Final sectPr - marks end of last section
+                section_contents.append(current_section)
+                print(f"  Found final sectPr (ends Section {len(section_contents) - 1})")
+
+        # Print summary
+        for idx, content in enumerate(section_contents):
+            print(f"  Section {idx}: {content['paragraphs']} paragraphs, {content['tables']} tables")
+
+        if len(section_contents) != len(doc.sections):
+            print(f"  WARNING: Content analysis found {len(section_contents)} sections, but python-docx reports {len(doc.sections)} sections!")
+
         print("=" * 60)
 
         # Copy page setup (margins, size, orientation) from each source section to corresponding target section
