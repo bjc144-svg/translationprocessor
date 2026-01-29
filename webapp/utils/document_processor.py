@@ -235,6 +235,21 @@ class DocumentProcessor:
                 target_section.page_width = source_section.page_width
                 target_section.orientation = source_section.orientation
 
+                # Check and fix section break type
+                # Section breaks can be: nextPage, evenPage, oddPage, continuous
+                # If set to evenPage or oddPage, it can cause blank pages
+                sectPr = target_section._sectPr
+                type_elem = sectPr.find(qn('w:type'))
+                if type_elem is not None:
+                    current_type = type_elem.get(qn('w:val'))
+                    print(f"Section {idx}: Current break type = {current_type}")
+                    if current_type in ('evenPage', 'oddPage'):
+                        print(f"  WARNING: Section {idx} has '{current_type}' break type which can cause blank pages!")
+                        print(f"  Changing to 'nextPage' to prevent blank pages")
+                        type_elem.set(qn('w:val'), 'nextPage')
+                else:
+                    print(f"Section {idx}: No type element found (default is nextPage)")
+
                 print(f"Section {idx}: Copied page setup - Height: {target_section.page_height}, Width: {target_section.page_width}, Orientation: {target_section.orientation}")
             else:
                 # More target sections than source sections (shouldn't happen, but handle gracefully)
