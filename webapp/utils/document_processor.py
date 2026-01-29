@@ -216,6 +216,40 @@ class DocumentProcessor:
         if len(section_contents) != len(doc.sections):
             print(f"  WARNING: Content analysis found {len(section_contents)} sections, but python-docx reports {len(doc.sections)} sections!")
 
+        # Debug: Check actual text content in Section 1 paragraphs
+        print("\nDEBUG: Analyzing Section 1 paragraph content...")
+        section_1_start_idx = None
+        current_section_idx = 0
+
+        for elem_idx, element in enumerate(doc.element.body):
+            tag = element.tag.split('}')[-1] if '}' in element.tag else element.tag
+
+            if tag == 'p':
+                # Check if this ends a section
+                pPr = element.find(f'{w_ns}pPr')
+                if pPr is not None and pPr.find(f'{w_ns}sectPr') is not None:
+                    current_section_idx += 1
+                    if current_section_idx == 1:
+                        section_1_start_idx = elem_idx + 1
+                        print(f"DEBUG: Section 1 starts at element index {section_1_start_idx}")
+                        break
+
+        # Now print first few paragraphs of Section 1
+        if section_1_start_idx is not None:
+            print("DEBUG: First 5 paragraphs of Section 1:")
+            para_count = 0
+            for elem_idx, element in enumerate(doc.element.body):
+                if elem_idx >= section_1_start_idx:
+                    tag = element.tag.split('}')[-1] if '}' in element.tag else element.tag
+                    if tag == 'p':
+                        # Get text content
+                        text_nodes = element.findall(f'.//{w_ns}t')
+                        text = ''.join([t.text or '' for t in text_nodes])
+                        print(f"  Para {para_count}: '{text[:100]}...' (len={len(text)})")
+                        para_count += 1
+                        if para_count >= 5:
+                            break
+
         print("=" * 60)
 
         # Copy page setup (margins, size, orientation) from each source section to corresponding target section
