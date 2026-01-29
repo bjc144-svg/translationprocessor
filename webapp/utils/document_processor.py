@@ -542,6 +542,13 @@ class DocumentProcessor:
 
                             print(f"  Para {para_count}: text_len={len(text)}{image_info}{props_info}")
 
+                            # If this paragraph has VML shapes, check their positioning
+                            if len(vml_shapes) > 0:
+                                print(f"    VML positioning details for Para {para_count}:")
+                                for vml_idx, vml_shape in enumerate(vml_shapes):
+                                    style = vml_shape.get('style')
+                                    print(f"      VML {vml_idx}: style='{style}'")
+
                         para_count += 1
 
                     elif tag == 'tbl':
@@ -908,14 +915,14 @@ class DocumentProcessor:
         run.font.size = Pt(9)
 
     def _add_num_pages(self, paragraph):
-        """Add SECTIONPAGES field to count only pages in the current section (translation, not certificates)"""
+        """Add NUMPAGES field to count total pages in the entire document"""
         run = paragraph.add_run()
         fldChar1 = OxmlElement('w:fldChar')
         fldChar1.set(qn('w:fldCharType'), 'begin')
 
         instrText = OxmlElement('w:instrText')
         instrText.set(qn('xml:space'), 'preserve')
-        instrText.text = 'SECTIONPAGES'
+        instrText.text = 'NUMPAGES'
 
         fldChar2 = OxmlElement('w:fldChar')
         fldChar2.set(qn('w:fldCharType'), 'end')
