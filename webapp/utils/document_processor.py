@@ -712,9 +712,9 @@ class DocumentProcessor:
 
         # Apply header/footer to ALL sections
         for section in doc.sections:
-            # Reduce header distance from top of page
-            section.header_distance = Inches(0.25)  # Closer to top
-            section.footer_distance = Inches(0.25)  # Closer to bottom
+            # Minimize header/footer distances to maximize content area
+            section.header_distance = Inches(0.15)  # Minimal distance from top
+            section.footer_distance = Inches(0.15)  # Minimal distance from bottom
 
             # Set up header
             header = section.header
@@ -756,15 +756,19 @@ class DocumentProcessor:
             left_cell = header_table.rows[0].cells[0]
             left_para = left_cell.paragraphs[0]
             left_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            # Minimize paragraph spacing
+            left_para.paragraph_format.space_before = Pt(0)
+            left_para.paragraph_format.space_after = Pt(0)
+            left_para.paragraph_format.line_spacing = 1.0
 
-            # Try to add logo image
+            # Try to add logo image (smaller to reduce header height)
             logo_path = self.assets_dir / 'park_logo.png'
             logo_added = False
 
             if logo_path.exists():
                 try:
                     run = left_para.add_run()
-                    run.add_picture(str(logo_path), height=Inches(0.5))
+                    run.add_picture(str(logo_path), height=Inches(0.4))  # Reduced from 0.5
                     logo_added = True
                     print(f"Successfully added Park logo from: {logo_path}")
                 except Exception as e:
@@ -776,7 +780,7 @@ class DocumentProcessor:
             if not logo_added:
                 left_para.text = "PARK EVALUATION SERVICES"
                 left_para.runs[0].font.bold = True
-                left_para.runs[0].font.size = Pt(10)
+                left_para.runs[0].font.size = Pt(9)  # Reduced from 10
                 print(f"Warning: Park logo file not found at: {logo_path}")
 
             # Right cell - Contact info
@@ -811,7 +815,7 @@ class DocumentProcessor:
                 para.paragraph_format.space_before = Pt(0)
                 para.paragraph_format.space_after = Pt(0)
                 run = para.runs[0]
-                run.font.size = Pt(10)
+                run.font.size = Pt(9)  # Reduced from 10
 
             # Add horizontal line after header using border
             line_para = header.add_paragraph()
@@ -858,11 +862,11 @@ class DocumentProcessor:
             # Add "CERTIFIED TRANSLATION" (centered, all caps, not bold)
             cert_para = footer.add_paragraph("CERTIFIED TRANSLATION")
             cert_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            # Make spacing extremely tight
+            # Make spacing extremely tight to minimize footer height
             cert_para.paragraph_format.space_before = Pt(0)
             cert_para.paragraph_format.space_after = Pt(0)
             cert_para.paragraph_format.line_spacing = 1.0
-            cert_para.runs[0].font.size = Pt(12)
+            cert_para.runs[0].font.size = Pt(10)  # Reduced from 12
 
             # Add footer info table (3 columns) - span full width like header
             footer_table = footer.add_table(1, 3, Inches(6.5))
@@ -895,7 +899,7 @@ class DocumentProcessor:
             left_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
             left_para.paragraph_format.space_before = Pt(0)
             left_para.paragraph_format.space_after = Pt(0)
-            left_para.runs[0].font.size = Pt(9)
+            left_para.runs[0].font.size = Pt(8)  # Reduced from 9
 
             # Center - Page number with field codes
             center_cell = footer_table.rows[0].cells[1]
@@ -906,14 +910,14 @@ class DocumentProcessor:
 
             # Add "Page " text
             run = center_para.add_run("Page ")
-            run.font.size = Pt(9)
+            run.font.size = Pt(8)  # Reduced from 9
 
             # Add PAGE field (current page number)
             self._add_page_number(center_para)
 
             # Add " of " text
             run = center_para.add_run(" of ")
-            run.font.size = Pt(9)
+            run.font.size = Pt(8)  # Reduced from 9
 
             # Add NUMPAGES field (total pages)
             self._add_num_pages(center_para)
@@ -925,7 +929,7 @@ class DocumentProcessor:
             right_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
             right_para.paragraph_format.space_before = Pt(0)
             right_para.paragraph_format.space_after = Pt(0)
-            right_para.runs[0].font.size = Pt(9)
+            right_para.runs[0].font.size = Pt(8)  # Reduced from 9
 
         # Save document
         doc.save(output_file)
@@ -962,7 +966,7 @@ class DocumentProcessor:
         run._r.append(fldChar1)
         run._r.append(instrText)
         run._r.append(fldChar2)
-        run.font.size = Pt(9)
+        run.font.size = Pt(8)  # Reduced from 9
 
     def _add_num_pages(self, paragraph):
         """Add formula field to calculate NUMPAGES - 2 (excludes 2 certificate pages)"""
@@ -1006,7 +1010,7 @@ class DocumentProcessor:
         fldChar_formula_end.set(qn('w:fldCharType'), 'end')
         run._r.append(fldChar_formula_end)
 
-        run.font.size = Pt(9)
+        run.font.size = Pt(8)  # Reduced from 9
 
     def _copy_document_body(self, source_doc, target_doc):
         """
