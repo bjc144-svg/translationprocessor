@@ -249,6 +249,46 @@ class DocumentProcessor:
         print(f"Original document had {len(original_doc.sections)} section(s)")
         print(f"Target document now has {len(doc.sections)} section(s)")
 
+        # Remove truly empty paragraphs (no text, no images, not section-ending)
+        # These can create unwanted blank space
+        print("\nRemoving empty paragraphs to prevent blank pages...")
+        w_ns = '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}'
+        drawing_ns = '{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}'
+        pic_ns = '{http://schemas.openxmlformats.org/drawingml/2006/picture}'
+        vml_ns = 'urn:schemas-microsoft-com:vml'
+
+        paragraphs_to_remove = []
+        for elem_idx, element in enumerate(doc.element.body):
+            tag = element.tag.split('}')[-1] if '}' in element.tag else element.tag
+
+            if tag == 'p':
+                # Check if this paragraph ends a section (contains sectPr)
+                pPr = element.find(f'{w_ns}pPr')
+                if pPr is not None and pPr.find(f'{w_ns}sectPr') is not None:
+                    # Don't remove section-ending paragraphs
+                    continue
+
+                # Check for text content
+                text_nodes = element.findall(f'.//{w_ns}t')
+                text = ''.join([t.text or '' for t in text_nodes])
+
+                # Check for images (all formats)
+                drawings = element.findall(f'.//{drawing_ns}inline') + element.findall(f'.//{drawing_ns}anchor')
+                pics = element.findall(f'.//{pic_ns}pic')
+                vml_shapes = element.findall(f'.//{{{vml_ns}}}shape') + element.findall(f'.//{{{vml_ns}}}imagedata')
+                pict_elements = element.findall(f'.//{w_ns}pict')
+
+                has_content = len(text) > 0 or len(drawings) > 0 or len(pics) > 0 or len(vml_shapes) > 0 or len(pict_elements) > 0
+
+                if not has_content:
+                    paragraphs_to_remove.append(element)
+
+        # Remove the empty paragraphs
+        for para_element in paragraphs_to_remove:
+            para_element.getparent().remove(para_element)
+
+        print(f"Removed {len(paragraphs_to_remove)} empty paragraphs")
+
         # Debug: Check content distribution across sections
         print("=" * 60)
         print("SECTION CONTENT ANALYSIS:")
