@@ -153,6 +153,29 @@ class DocumentProcessor:
         # By creating a new document with all content in one section, SECTIONPAGES will count all pages
         print(f"Original document has {len(original_doc.sections)} section(s)")
 
+        # Debug: Analyze source document's Section 1 to find where images are
+        print("\n" + "=" * 60)
+        print("DEBUG: Analyzing SOURCE document structure...")
+        w_ns = '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}'
+
+        # Find all body elements and categorize them
+        source_elements = []
+        section_idx = 0
+        for element in original_doc.element.body:
+            tag = element.tag.split('}')[-1] if '}' in element.tag else element.tag
+            source_elements.append(tag)
+
+            # Check if this ends a section
+            if tag == 'p':
+                pPr = element.find(f'{w_ns}pPr')
+                if pPr is not None and pPr.find(f'{w_ns}sectPr') is not None:
+                    print(f"SOURCE: Section {section_idx} ends at element with tag '{tag}'")
+                    section_idx += 1
+
+        print(f"SOURCE: Total body elements: {len(source_elements)}")
+        print(f"SOURCE: Element types: {', '.join(set(source_elements))}")
+        print("=" * 60 + "\n")
+
         # Create a new document to consolidate content
         doc = Document()
 
