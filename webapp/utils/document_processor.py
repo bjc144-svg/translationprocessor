@@ -194,20 +194,26 @@ class DocumentProcessor:
             print(f"SOURCE: Section 1 starts at element index {section_1_start_idx}")
             print("SOURCE: First 5 paragraphs of Section 1:")
             para_count = 0
+            drawing_ns = '{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}'
+            pic_ns = '{http://schemas.openxmlformats.org/drawingml/2006/picture}'
+            vml_ns = 'urn:schemas-microsoft-com:vml'
+
             for elem_idx, element in enumerate(original_doc.element.body):
                 if elem_idx >= section_1_start_idx:
                     tag = element.tag.split('}')[-1] if '}' in element.tag else element.tag
                     if tag == 'p':
-                        drawing_ns = '{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}'
-                        pic_ns = '{http://schemas.openxmlformats.org/drawingml/2006/picture}'
+                        # Check for all image formats
                         drawings = element.findall(f'.//{drawing_ns}inline') + element.findall(f'.//{drawing_ns}anchor')
                         pics = element.findall(f'.//{pic_ns}pic')
+                        vml_shapes = element.findall(f'.//{{{vml_ns}}}shape') + element.findall(f'.//{{{vml_ns}}}imagedata')
+                        pict_elements = element.findall(f'.//{w_ns}pict')
 
                         text_nodes = element.findall(f'.//{w_ns}t')
                         text = ''.join([t.text or '' for t in text_nodes])
 
-                        has_images = len(drawings) > 0 or len(pics) > 0
-                        image_info = f" [HAS {len(drawings)} drawings, {len(pics)} pics]" if has_images else " [NO IMAGES]"
+                        total = len(drawings) + len(pics) + len(vml_shapes) + len(pict_elements)
+                        has_images = total > 0
+                        image_info = f" [HAS {len(drawings)} drawings, {len(pics)} pics, {len(vml_shapes)} VML, {len(pict_elements)} pict]" if has_images else " [NO IMAGES]"
 
                         print(f"  SOURCE Para {para_count}: text_len={len(text)}{image_info}")
                         para_count += 1
@@ -303,24 +309,32 @@ class DocumentProcessor:
                 rows = element.findall(f'.//{w_ns}tr')
                 print(f"    Total rows: {len(rows)}")
 
-                # Check each cell for images
+                # Check each cell for images (all formats)
+                vml_ns = 'urn:schemas-microsoft-com:vml'
                 total_images = 0
                 cells_with_images = []
                 for row_idx, row in enumerate(rows):
                     cells = row.findall(f'.//{w_ns}tc')
                     for cell_idx, cell in enumerate(cells):
-                        # Check for drawings/images in this cell
+                        # Check for DrawingML images (modern format)
                         drawings = cell.findall(f'.//{drawing_ns}inline') + cell.findall(f'.//{drawing_ns}anchor')
                         pics = cell.findall(f'.//{pic_ns}pic')
 
-                        if drawings or pics:
-                            total_images += len(drawings) + len(pics)
-                            cells_with_images.append((row_idx, cell_idx, len(drawings), len(pics)))
+                        # Check for VML shapes (legacy format)
+                        vml_shapes = cell.findall(f'.//{{{vml_ns}}}shape') + cell.findall(f'.//{{{vml_ns}}}imagedata')
+
+                        # Check for w:pict elements (picture containers)
+                        pict_elements = cell.findall(f'.//{w_ns}pict')
+
+                        total_in_cell = len(drawings) + len(pics) + len(vml_shapes) + len(pict_elements)
+                        if total_in_cell > 0:
+                            total_images += total_in_cell
+                            cells_with_images.append((row_idx, cell_idx, len(drawings), len(pics), len(vml_shapes), len(pict_elements)))
 
                 if total_images > 0:
                     print(f"    ** Table contains {total_images} total images! **")
-                    for row_idx, cell_idx, n_drawings, n_pics in cells_with_images:
-                        print(f"      Cell[{row_idx}][{cell_idx}]: {n_drawings} drawings, {n_pics} pics")
+                    for row_idx, cell_idx, n_drawings, n_pics, n_vml, n_pict in cells_with_images:
+                        print(f"      Cell[{row_idx}][{cell_idx}]: {n_drawings} drawings, {n_pics} pics, {n_vml} VML, {n_pict} pict")
                 else:
                     print(f"    No images found in this table")
 
@@ -348,6 +362,7 @@ class DocumentProcessor:
 
             drawing_ns = '{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}'
             pic_ns = '{http://schemas.openxmlformats.org/drawingml/2006/picture}'
+            vml_ns = 'urn:schemas-microsoft-com:vml'
 
             para_count = 0
             table_count = 0
@@ -370,12 +385,15 @@ class DocumentProcessor:
                             text_nodes = element.findall(f'.//{w_ns}t')
                             text = ''.join([t.text or '' for t in text_nodes])
 
-                            # Check for images/drawings
+                            # Check for images/drawings (all formats)
                             drawings = element.findall(f'.//{drawing_ns}inline') + element.findall(f'.//{drawing_ns}anchor')
                             pics = element.findall(f'.//{pic_ns}pic')
+                            vml_shapes = element.findall(f'.//{{{vml_ns}}}shape') + element.findall(f'.//{{{vml_ns}}}imagedata')
+                            pict_elements = element.findall(f'.//{w_ns}pict')
 
-                            has_images = len(drawings) > 0 or len(pics) > 0
-                            image_info = f" [HAS {len(drawings)} drawings, {len(pics)} pics]" if has_images else " [NO IMAGES]"
+                            total = len(drawings) + len(pics) + len(vml_shapes) + len(pict_elements)
+                            has_images = total > 0
+                            image_info = f" [HAS {len(drawings)} drawings, {len(pics)} pics, {len(vml_shapes)} VML, {len(pict_elements)} pict]" if has_images else " [NO IMAGES]"
 
                             # Check for page break before property
                             page_break_before = False
@@ -398,18 +416,21 @@ class DocumentProcessor:
                         rows = element.findall(f'.//{w_ns}tr')
                         print(f"    Rows: {len(rows)}")
 
-                        # Check each cell for images
+                        # Check each cell for images (all formats)
                         total_images_in_table = 0
                         for row_idx, row in enumerate(rows):
                             cells = row.findall(f'.//{w_ns}tc')
                             for cell_idx, cell in enumerate(cells):
-                                # Check for drawings/images in this cell
+                                # Check for all image types
                                 drawings = cell.findall(f'.//{drawing_ns}inline') + cell.findall(f'.//{drawing_ns}anchor')
                                 pics = cell.findall(f'.//{pic_ns}pic')
+                                vml_shapes = cell.findall(f'.//{{{vml_ns}}}shape') + cell.findall(f'.//{{{vml_ns}}}imagedata')
+                                pict_elements = cell.findall(f'.//{w_ns}pict')
 
-                                if drawings or pics:
-                                    total_images_in_table += len(drawings) + len(pics)
-                                    print(f"      Cell[{row_idx}][{cell_idx}]: {len(drawings)} drawings, {len(pics)} pics")
+                                total_in_cell = len(drawings) + len(pics) + len(vml_shapes) + len(pict_elements)
+                                if total_in_cell > 0:
+                                    total_images_in_table += total_in_cell
+                                    print(f"      Cell[{row_idx}][{cell_idx}]: {len(drawings)} drawings, {len(pics)} pics, {len(vml_shapes)} VML, {len(pict_elements)} pict")
 
                         if total_images_in_table > 0:
                             print(f"    ** TABLE {table_count} contains {total_images_in_table} total images! **")
