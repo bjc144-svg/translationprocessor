@@ -297,46 +297,87 @@ class DocumentProcessor:
                         print(f"DEBUG: Section 1 starts at element index {section_1_start_idx}")
                         break
 
-        # Now print first few paragraphs of Section 1
+        # Now analyze Section 1 content in detail
         if section_1_start_idx is not None:
-            print("DEBUG: First 5 paragraphs of Section 1:")
+            print("DEBUG: Analyzing Section 1 content in detail...")
+
+            drawing_ns = '{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}'
+            pic_ns = '{http://schemas.openxmlformats.org/drawingml/2006/picture}'
+
             para_count = 0
+            table_count = 0
+            section_ended = False
+
             for elem_idx, element in enumerate(doc.element.body):
-                if elem_idx >= section_1_start_idx:
+                if elem_idx >= section_1_start_idx and not section_ended:
                     tag = element.tag.split('}')[-1] if '}' in element.tag else element.tag
+
                     if tag == 'p':
-                        # Get text content
-                        text_nodes = element.findall(f'.//{w_ns}t')
-                        text = ''.join([t.text or '' for t in text_nodes])
-
-                        # Check for images/drawings
-                        drawing_ns = '{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}'
-                        pic_ns = '{http://schemas.openxmlformats.org/drawingml/2006/picture}'
-                        drawings = element.findall(f'.//{drawing_ns}inline') + element.findall(f'.//{drawing_ns}anchor')
-                        pics = element.findall(f'.//{pic_ns}pic')
-
-                        has_images = len(drawings) > 0 or len(pics) > 0
-                        image_info = f" [HAS {len(drawings)} drawings, {len(pics)} pics]" if has_images else " [NO IMAGES]"
-
-                        # Also show what child elements this paragraph DOES have
-                        child_tags = [child.tag.split('}')[-1] if '}' in child.tag else child.tag for child in element]
-                        child_summary = ', '.join(set(child_tags)) if child_tags else 'EMPTY'
-
-                        # Check for page break before property
+                        # Check if this paragraph ends the section
                         pPr = element.find(f'{w_ns}pPr')
-                        page_break_before = False
-                        if pPr is not None:
-                            pageBreakBefore = pPr.find(f'{w_ns}pageBreakBefore')
-                            if pageBreakBefore is not None:
-                                page_break_before = True
-
-                        pb_info = " [PAGE BREAK BEFORE!]" if page_break_before else ""
-
-                        print(f"  Para {para_count}: '{text[:100]}...' (len={len(text)}){image_info}{pb_info}")
-                        print(f"    Children: {child_summary}")
-                        para_count += 1
-                        if para_count >= 5:
+                        if pPr is not None and pPr.find(f'{w_ns}sectPr') is not None:
+                            section_ended = True
+                            print(f"DEBUG: Section 1 ends after {para_count} paragraphs and {table_count} tables")
                             break
+
+                        if para_count < 5:  # Only print first 5 paragraphs
+                            # Get text content
+                            text_nodes = element.findall(f'.//{w_ns}t')
+                            text = ''.join([t.text or '' for t in text_nodes])
+
+                            # Check for images/drawings
+                            drawings = element.findall(f'.//{drawing_ns}inline') + element.findall(f'.//{drawing_ns}anchor')
+                            pics = element.findall(f'.//{pic_ns}pic')
+
+                            has_images = len(drawings) > 0 or len(pics) > 0
+                            image_info = f" [HAS {len(drawings)} drawings, {len(pics)} pics]" if has_images else " [NO IMAGES]"
+
+                            # Check for page break before property
+                            page_break_before = False
+                            if pPr is not None:
+                                pageBreakBefore = pPr.find(f'{w_ns}pageBreakBefore')
+                                if pageBreakBefore is not None:
+                                    page_break_before = True
+
+                            pb_info = " [PAGE BREAK BEFORE!]" if page_break_before else ""
+
+                            print(f"  Para {para_count}: text_len={len(text)}{image_info}{pb_info}")
+
+                        para_count += 1
+
+                    elif tag == 'tbl':
+                        # Found a table in Section 1! Examine it for images
+                        print(f"  TABLE {table_count} in Section 1:")
+
+                        # Count rows and cells
+                        rows = element.findall(f'.//{w_ns}tr')
+                        print(f"    Rows: {len(rows)}")
+
+                        # Check each cell for images
+                        total_images_in_table = 0
+                        for row_idx, row in enumerate(rows):
+                            cells = row.findall(f'.//{w_ns}tc')
+                            for cell_idx, cell in enumerate(cells):
+                                # Check for drawings/images in this cell
+                                drawings = cell.findall(f'.//{drawing_ns}inline') + cell.findall(f'.//{drawing_ns}anchor')
+                                pics = cell.findall(f'.//{pic_ns}pic')
+
+                                if drawings or pics:
+                                    total_images_in_table += len(drawings) + len(pics)
+                                    print(f"      Cell[{row_idx}][{cell_idx}]: {len(drawings)} drawings, {len(pics)} pics")
+
+                        if total_images_in_table > 0:
+                            print(f"    ** TABLE {table_count} contains {total_images_in_table} total images! **")
+                        else:
+                            print(f"    No images found in this table")
+
+                        table_count += 1
+
+                    elif tag == 'sectPr':
+                        # Final sectPr - ends Section 1
+                        section_ended = True
+                        print(f"DEBUG: Section 1 ends (final sectPr) after {para_count} paragraphs and {table_count} tables")
+                        break
 
         print("=" * 60)
 
