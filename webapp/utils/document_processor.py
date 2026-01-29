@@ -476,6 +476,18 @@ class DocumentProcessor:
         doc.save(output_file)
         print(f"Saved document with header/footer to: {output_file}")
 
+        # Also save a copy to the output folder for inspection
+        import shutil
+        from pathlib import Path
+        output_folder = Path(output_file).parent.parent / "output"
+        debug_copy = output_folder / "DEBUG_translation_with_header.docx"
+        try:
+            shutil.copy2(output_file, debug_copy)
+            print(f"DEBUG: Saved copy for inspection at: {debug_copy}")
+            print(f"DEBUG: Please open this file in Word to check if blank page 2 exists there")
+        except Exception as e:
+            print(f"DEBUG: Failed to save debug copy: {e}")
+
     def _add_page_number(self, paragraph):
         """Add PAGE field to paragraph for current page number"""
         run = paragraph.add_run()
