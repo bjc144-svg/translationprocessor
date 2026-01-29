@@ -322,7 +322,17 @@ class DocumentProcessor:
                         child_tags = [child.tag.split('}')[-1] if '}' in child.tag else child.tag for child in element]
                         child_summary = ', '.join(set(child_tags)) if child_tags else 'EMPTY'
 
-                        print(f"  Para {para_count}: '{text[:100]}...' (len={len(text)}){image_info}")
+                        # Check for page break before property
+                        pPr = element.find(f'{w_ns}pPr')
+                        page_break_before = False
+                        if pPr is not None:
+                            pageBreakBefore = pPr.find(f'{w_ns}pageBreakBefore')
+                            if pageBreakBefore is not None:
+                                page_break_before = True
+
+                        pb_info = " [PAGE BREAK BEFORE!]" if page_break_before else ""
+
+                        print(f"  Para {para_count}: '{text[:100]}...' (len={len(text)}){image_info}{pb_info}")
                         print(f"    Children: {child_summary}")
                         para_count += 1
                         if para_count >= 5:
