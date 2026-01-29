@@ -338,6 +338,34 @@ class DocumentProcessor:
                 else:
                     print(f"    No images found in this table")
 
+                # Check table properties that might affect layout
+                print(f"  Checking table layout properties...")
+                tblPr = element.find(f'{w_ns}tblPr')
+                if tblPr is not None:
+                    # Check table layout
+                    tblLayout = tblPr.find(f'{w_ns}tblLayout')
+                    if tblLayout is not None:
+                        layout_type = tblLayout.get(f'{w_ns}type')
+                        print(f"    Table layout type: {layout_type}")
+
+                # Check if any rows have cantSplit (prevents row from breaking across pages)
+                cant_split_rows = []
+                for row_idx, row in enumerate(rows):
+                    trPr = row.find(f'{w_ns}trPr')
+                    if trPr is not None:
+                        cantSplit = trPr.find(f'{w_ns}cantSplit')
+                        if cantSplit is not None:
+                            val = cantSplit.get(f'{w_ns}val')
+                            # cantSplit defaults to true if present, unless explicitly set to "0" or "false"
+                            if val not in ('0', 'false'):
+                                cant_split_rows.append(row_idx)
+
+                if cant_split_rows:
+                    print(f"    WARNING: {len(cant_split_rows)} rows have cantSplit=true (can't break across pages)")
+                    print(f"    Row indices: {cant_split_rows[:10]}..." if len(cant_split_rows) > 10 else f"    Row indices: {cant_split_rows}")
+                else:
+                    print(f"    No rows with cantSplit property")
+
         # Debug: Check actual text content in Section 1 paragraphs
         print("\nDEBUG: Analyzing Section 1 paragraph content...")
         section_1_start_idx = None
@@ -395,16 +423,34 @@ class DocumentProcessor:
                             has_images = total > 0
                             image_info = f" [HAS {len(drawings)} drawings, {len(pics)} pics, {len(vml_shapes)} VML, {len(pict_elements)} pict]" if has_images else " [NO IMAGES]"
 
-                            # Check for page break before property
-                            page_break_before = False
+                            # Check paragraph properties in detail
+                            pPr_props = []
                             if pPr is not None:
-                                pageBreakBefore = pPr.find(f'{w_ns}pageBreakBefore')
-                                if pageBreakBefore is not None:
-                                    page_break_before = True
+                                # Check for page break before
+                                if pPr.find(f'{w_ns}pageBreakBefore') is not None:
+                                    pPr_props.append("pageBreakBefore")
+                                # Check for keep with next
+                                if pPr.find(f'{w_ns}keepNext') is not None:
+                                    pPr_props.append("keepNext")
+                                # Check for keep lines together
+                                if pPr.find(f'{w_ns}keepLines') is not None:
+                                    pPr_props.append("keepLines")
+                                # Check for widow control
+                                if pPr.find(f'{w_ns}widowControl') is not None:
+                                    pPr_props.append("widowControl")
+                                # Check spacing before/after
+                                spacing = pPr.find(f'{w_ns}spacing')
+                                if spacing is not None:
+                                    before = spacing.get(f'{w_ns}before')
+                                    after = spacing.get(f'{w_ns}after')
+                                    if before:
+                                        pPr_props.append(f"spacingBefore={before}")
+                                    if after:
+                                        pPr_props.append(f"spacingAfter={after}")
 
-                            pb_info = " [PAGE BREAK BEFORE!]" if page_break_before else ""
+                            props_info = f" [Props: {', '.join(pPr_props)}]" if pPr_props else " [No special props]"
 
-                            print(f"  Para {para_count}: text_len={len(text)}{image_info}{pb_info}")
+                            print(f"  Para {para_count}: text_len={len(text)}{image_info}{props_info}")
 
                         para_count += 1
 
@@ -444,6 +490,39 @@ class DocumentProcessor:
                         section_ended = True
                         print(f"DEBUG: Section 1 ends (final sectPr) after {para_count} paragraphs and {table_count} tables")
                         break
+
+        # Debug: Check the paragraph that ENDS Section 0 (contains sectPr for section break)
+        print("\nDEBUG: Analyzing the paragraph that ends Section 0...")
+        for elem_idx, element in enumerate(doc.element.body):
+            tag = element.tag.split('}')[-1] if '}' in element.tag else element.tag
+            if tag == 'p':
+                pPr = element.find(f'{w_ns}pPr')
+                if pPr is not None:
+                    sectPr_in_para = pPr.find(f'{w_ns}sectPr')
+                    if sectPr_in_para is not None:
+                        # This paragraph ends Section 0
+                        print(f"  Found section break at paragraph (element {elem_idx})")
+
+                        # Check the section break type
+                        type_elem = sectPr_in_para.find(f'{w_ns}type')
+                        if type_elem is not None:
+                            break_type = type_elem.get(f'{w_ns}val')
+                            print(f"  Section break type: {break_type}")
+                        else:
+                            print(f"  Section break type: (default = nextPage)")
+
+                        # Check if this paragraph has any content
+                        text_nodes = element.findall(f'.//{w_ns}t')
+                        text = ''.join([t.text or '' for t in text_nodes])
+                        print(f"  Paragraph text length: {len(text)}")
+
+                        # Check paragraph properties
+                        if pPr.find(f'{w_ns}pageBreakBefore') is not None:
+                            print(f"  WARNING: Has pageBreakBefore property!")
+                        if pPr.find(f'{w_ns}keepNext') is not None:
+                            print(f"  Has keepNext property")
+
+                        break  # Only check the first section break
 
         print("=" * 60)
 
