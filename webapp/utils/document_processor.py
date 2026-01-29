@@ -255,7 +255,12 @@ class DocumentProcessor:
                         has_images = len(drawings) > 0 or len(pics) > 0
                         image_info = f" [HAS {len(drawings)} drawings, {len(pics)} pics]" if has_images else " [NO IMAGES]"
 
+                        # Also show what child elements this paragraph DOES have
+                        child_tags = [child.tag.split('}')[-1] if '}' in child.tag else child.tag for child in element]
+                        child_summary = ', '.join(set(child_tags)) if child_tags else 'EMPTY'
+
                         print(f"  Para {para_count}: '{text[:100]}...' (len={len(text)}){image_info}")
+                        print(f"    Children: {child_summary}")
                         para_count += 1
                         if para_count >= 5:
                             break
