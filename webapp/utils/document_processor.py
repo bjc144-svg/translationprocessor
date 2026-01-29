@@ -245,7 +245,17 @@ class DocumentProcessor:
                         # Get text content
                         text_nodes = element.findall(f'.//{w_ns}t')
                         text = ''.join([t.text or '' for t in text_nodes])
-                        print(f"  Para {para_count}: '{text[:100]}...' (len={len(text)})")
+
+                        # Check for images/drawings
+                        drawing_ns = '{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}'
+                        pic_ns = '{http://schemas.openxmlformats.org/drawingml/2006/picture}'
+                        drawings = element.findall(f'.//{drawing_ns}inline') + element.findall(f'.//{drawing_ns}anchor')
+                        pics = element.findall(f'.//{pic_ns}pic')
+
+                        has_images = len(drawings) > 0 or len(pics) > 0
+                        image_info = f" [HAS {len(drawings)} drawings, {len(pics)} pics]" if has_images else " [NO IMAGES]"
+
+                        print(f"  Para {para_count}: '{text[:100]}...' (len={len(text)}){image_info}")
                         para_count += 1
                         if para_count >= 5:
                             break
