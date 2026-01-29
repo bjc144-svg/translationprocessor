@@ -279,6 +279,51 @@ class DocumentProcessor:
         if len(section_contents) != len(doc.sections):
             print(f"  WARNING: Content analysis found {len(section_contents)} sections, but python-docx reports {len(doc.sections)} sections!")
 
+        # Debug: Check Section 0's table for images (might be where page 2 images are!)
+        print("\nDEBUG: Analyzing Section 0's table for images...")
+        drawing_ns = '{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}'
+        pic_ns = '{http://schemas.openxmlformats.org/drawingml/2006/picture}'
+
+        section_0_table_found = False
+        for elem_idx, element in enumerate(doc.element.body):
+            tag = element.tag.split('}')[-1] if '}' in element.tag else element.tag
+
+            # Stop when we hit the section break (end of Section 0)
+            if tag == 'p':
+                pPr = element.find(f'{w_ns}pPr')
+                if pPr is not None and pPr.find(f'{w_ns}sectPr') is not None:
+                    break
+
+            # Check if this is a table
+            if tag == 'tbl' and not section_0_table_found:
+                section_0_table_found = True
+                print(f"  Found table in Section 0 at element index {elem_idx}")
+
+                # Count rows and cells
+                rows = element.findall(f'.//{w_ns}tr')
+                print(f"    Total rows: {len(rows)}")
+
+                # Check each cell for images
+                total_images = 0
+                cells_with_images = []
+                for row_idx, row in enumerate(rows):
+                    cells = row.findall(f'.//{w_ns}tc')
+                    for cell_idx, cell in enumerate(cells):
+                        # Check for drawings/images in this cell
+                        drawings = cell.findall(f'.//{drawing_ns}inline') + cell.findall(f'.//{drawing_ns}anchor')
+                        pics = cell.findall(f'.//{pic_ns}pic')
+
+                        if drawings or pics:
+                            total_images += len(drawings) + len(pics)
+                            cells_with_images.append((row_idx, cell_idx, len(drawings), len(pics)))
+
+                if total_images > 0:
+                    print(f"    ** Table contains {total_images} total images! **")
+                    for row_idx, cell_idx, n_drawings, n_pics in cells_with_images:
+                        print(f"      Cell[{row_idx}][{cell_idx}]: {n_drawings} drawings, {n_pics} pics")
+                else:
+                    print(f"    No images found in this table")
+
         # Debug: Check actual text content in Section 1 paragraphs
         print("\nDEBUG: Analyzing Section 1 paragraph content...")
         section_1_start_idx = None
