@@ -915,14 +915,14 @@ class DocumentProcessor:
         run.font.size = Pt(9)
 
     def _add_num_pages(self, paragraph):
-        """Add NUMPAGES field to count total pages in the entire document"""
+        """Add formula field to calculate NUMPAGES - 2 (excludes 2 certificate pages)"""
         run = paragraph.add_run()
         fldChar1 = OxmlElement('w:fldChar')
         fldChar1.set(qn('w:fldCharType'), 'begin')
 
         instrText = OxmlElement('w:instrText')
         instrText.set(qn('xml:space'), 'preserve')
-        instrText.text = 'NUMPAGES'
+        instrText.text = '= NUMPAGES - 2'
 
         fldChar2 = OxmlElement('w:fldChar')
         fldChar2.set(qn('w:fldCharType'), 'end')
