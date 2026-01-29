@@ -1500,7 +1500,6 @@ class DocumentProcessor:
         doc.add_paragraph()  # Additional spacing
         doc.add_paragraph()  # Additional spacing
         doc.add_paragraph()  # Additional spacing
-        doc.add_paragraph()  # Additional spacing
 
         # Footer with contact info image
         footer_para = doc.add_paragraph()
@@ -1654,7 +1653,6 @@ class DocumentProcessor:
 
         doc.add_paragraph()  # Spacing
         doc.add_paragraph()  # Spacing
-        doc.add_paragraph()  # Additional spacing
         doc.add_paragraph()  # Additional spacing
         doc.add_paragraph()  # Additional spacing
         doc.add_paragraph()  # Additional spacing
