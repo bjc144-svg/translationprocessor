@@ -180,6 +180,33 @@ class DocumentProcessor:
         print(f"Original document had {len(original_doc.sections)} section(s)")
         print(f"Target document now has {len(doc.sections)} section(s)")
 
+        # Debug: Check content distribution across sections
+        print("=" * 60)
+        print("SECTION CONTENT ANALYSIS:")
+        for idx in range(len(doc.sections)):
+            # Count elements that belong to this section
+            # This is approximate - we're just counting paragraphs and tables
+            if idx == 0:
+                # First section - count from start
+                section_para_count = 0
+                section_table_count = 0
+                for element in doc.element.body:
+                    tag = element.tag.split('}')[-1] if '}' in element.tag else element.tag
+                    if tag == 'p':
+                        # Check if this paragraph has sectPr (marks end of section)
+                        w_ns = '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}'
+                        pPr = element.find(f'{w_ns}pPr')
+                        if pPr is not None and pPr.find(f'{w_ns}sectPr') is not None:
+                            section_para_count += 1
+                            break  # This marks the end of the section
+                        section_para_count += 1
+                    elif tag == 'tbl':
+                        section_table_count += 1
+                print(f"  Section {idx}: {section_para_count} paragraphs, {section_table_count} tables")
+            else:
+                print(f"  Section {idx}: (content counting across sections not fully implemented)")
+        print("=" * 60)
+
         # Copy page setup (margins, size, orientation) from each source section to corresponding target section
         for idx, target_section in enumerate(doc.sections):
             if idx < len(original_doc.sections):
@@ -946,6 +973,8 @@ class DocumentProcessor:
         doc.add_paragraph()  # Spacing
         doc.add_paragraph()  # Additional spacing
         doc.add_paragraph()  # Additional spacing
+        doc.add_paragraph()  # Additional spacing
+        doc.add_paragraph()  # Additional spacing
 
         # Footer with contact info image
         footer_para = doc.add_paragraph()
@@ -1099,6 +1128,8 @@ class DocumentProcessor:
 
         doc.add_paragraph()  # Spacing
         doc.add_paragraph()  # Spacing
+        doc.add_paragraph()  # Additional spacing
+        doc.add_paragraph()  # Additional spacing
         doc.add_paragraph()  # Additional spacing
         doc.add_paragraph()  # Additional spacing
 
