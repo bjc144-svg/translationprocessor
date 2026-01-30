@@ -113,24 +113,23 @@ class DocumentProcessor:
 
                 # Determine which certificates to include based on division
                 division = metadata.get('division', 'PARK')
-                include_translator_cert = (division != 'EEI')
 
                 documents_to_combine = [translation_docx]
 
-                # Step 2: Create translator certificate (skip if division is EEI)
-                if include_translator_cert:
-                    print("Step 2: Creating translator certificate...")
-                    translator_cert_docx = temp_path / "translator_certificate.docx"
-                    self.create_translator_certificate(translator_cert_docx, metadata)
-                    documents_to_combine.append(translator_cert_docx)
-                else:
-                    print("Step 2: Skipping translator certificate (division is EEI)...")
+                # Step 2: Create translator certificate (always included)
+                print("Step 2: Creating translator certificate...")
+                translator_cert_docx = temp_path / "translator_certificate.docx"
+                self.create_translator_certificate(translator_cert_docx, metadata)
+                documents_to_combine.append(translator_cert_docx)
 
-                # Step 3: Create Park certificate
-                print("Step 3: Creating Park certificate...")
-                park_cert_docx = temp_path / "park_certificate.docx"
-                self.create_park_certificate(park_cert_docx, metadata)
-                documents_to_combine.append(park_cert_docx)
+                # Step 3: Create Park certificate (skip if division is EEI)
+                if division != 'EEI':
+                    print("Step 3: Creating Park certificate...")
+                    park_cert_docx = temp_path / "park_certificate.docx"
+                    self.create_park_certificate(park_cert_docx, metadata)
+                    documents_to_combine.append(park_cert_docx)
+                else:
+                    print("Step 3: Skipping Park certificate (division is EEI)...")
 
                 # Step 4: Combine documents
                 print(f"Step 4: Combining documents ({len(documents_to_combine)} total)...")
