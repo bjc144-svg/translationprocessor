@@ -25,6 +25,11 @@ class DocumentProcessor:
         self.assets_dir = Path(__file__).parent.parent / 'assets'
         self.assets_dir.mkdir(parents=True, exist_ok=True)
 
+        # Cache for external tool paths (to avoid repeated lookups and logging)
+        self._libreoffice_path = None
+        self._poppler_path = None
+        self._paths_checked = False
+
     def convert_doc_to_docx(self, doc_path):
         """Convert .doc file to .docx using Word COM"""
         try:
@@ -155,10 +160,15 @@ class DocumentProcessor:
     def _find_libreoffice(self):
         """
         Find LibreOffice executable path (cross-platform).
+        Uses caching to avoid repeated lookups.
 
         Returns:
             Path to LibreOffice executable, or None if not found
         """
+        # Return cached value if already found
+        if self._libreoffice_path is not None:
+            return self._libreoffice_path
+
         import platform
         import subprocess
         from pathlib import Path
@@ -178,8 +188,10 @@ class DocumentProcessor:
                 if isinstance(path, str):
                     path = Path(path)
                 if path.exists():
-                    print(f"  Found LibreOffice at: {path}")
-                    return str(path)
+                    self._libreoffice_path = str(path)
+                    if not self._paths_checked:
+                        print(f"Found LibreOffice at: {path}")
+                    return self._libreoffice_path
 
             return None
 
@@ -189,13 +201,19 @@ class DocumentProcessor:
                 result = subprocess.run(['which', 'libreoffice'],
                                       capture_output=True, text=True, timeout=5)
                 if result.returncode == 0 and result.stdout.strip():
-                    return result.stdout.strip()
+                    self._libreoffice_path = result.stdout.strip()
+                    if not self._paths_checked:
+                        print(f"Found LibreOffice at: {self._libreoffice_path}")
+                    return self._libreoffice_path
 
                 # Alternative name on some systems
                 result = subprocess.run(['which', 'soffice'],
                                       capture_output=True, text=True, timeout=5)
                 if result.returncode == 0 and result.stdout.strip():
-                    return result.stdout.strip()
+                    self._libreoffice_path = result.stdout.strip()
+                    if not self._paths_checked:
+                        print(f"Found LibreOffice at: {self._libreoffice_path}")
+                    return self._libreoffice_path
             except:
                 pass
 
@@ -204,7 +222,10 @@ class DocumentProcessor:
                           '/usr/local/bin/libreoffice', '/usr/local/bin/soffice']
             for path in common_paths:
                 if Path(path).exists():
-                    return path
+                    self._libreoffice_path = path
+                    if not self._paths_checked:
+                        print(f"Found LibreOffice at: {path}")
+                    return self._libreoffice_path
 
             return None
 
@@ -213,10 +234,15 @@ class DocumentProcessor:
     def _find_poppler(self):
         """
         Find poppler binaries path (cross-platform).
+        Uses caching to avoid repeated lookups.
 
         Returns:
             Path to poppler bin directory, or None if not found
         """
+        # Return cached value if already found
+        if self._poppler_path is not None:
+            return self._poppler_path
+
         import platform
         from pathlib import Path
 
@@ -242,7 +268,10 @@ class DocumentProcessor:
                 if result.returncode == 0 and result.stdout.strip():
                     # Get the directory containing pdftoppm.exe
                     pdftoppm_path = result.stdout.strip().split('\n')[0]
-                    return str(Path(pdftoppm_path).parent)
+                    self._poppler_path = str(Path(pdftoppm_path).parent)
+                    if not self._paths_checked:
+                        print(f"Found poppler at: {self._poppler_path}")
+                    return self._poppler_path
             except:
                 pass
 
@@ -250,8 +279,10 @@ class DocumentProcessor:
                 if isinstance(path, str):
                     path = Path(path)
                 if path.exists() and (path / 'pdftoppm.exe').exists():
-                    print(f"  Found poppler at: {path}")
-                    return str(path)
+                    self._poppler_path = str(path)
+                    if not self._paths_checked:
+                        print(f"Found poppler at: {path}")
+                    return self._poppler_path
 
             return None
 
@@ -263,7 +294,10 @@ class DocumentProcessor:
                                       capture_output=True, text=True, timeout=5)
                 if result.returncode == 0 and result.stdout.strip():
                     # Return the directory, not the full path to pdftoppm
-                    return str(Path(result.stdout.strip()).parent)
+                    self._poppler_path = str(Path(result.stdout.strip()).parent)
+                    if not self._paths_checked:
+                        print(f"Found poppler at: {self._poppler_path}")
+                    return self._poppler_path
             except:
                 pass
 
@@ -271,7 +305,10 @@ class DocumentProcessor:
             common_paths = ['/usr/bin', '/usr/local/bin']
             for path in common_paths:
                 if Path(path).exists() and (Path(path) / 'pdftoppm').exists():
-                    return path
+                    self._poppler_path = path
+                    if not self._paths_checked:
+                        print(f"Found poppler at: {path}")
+                    return self._poppler_path
 
             return None
 
@@ -318,6 +355,9 @@ class DocumentProcessor:
                     "- Ubuntu/Debian: sudo apt-get install poppler-utils\n"
                     "- macOS: brew install poppler"
                 )
+
+        # Mark paths as checked (prevents repeated "Found..." messages)
+        self._paths_checked = True
 
         # Create temporary directory for conversion
         temp_dir = Path(tempfile.mkdtemp(prefix='docx2img_'))
@@ -403,7 +443,9 @@ class DocumentProcessor:
         from io import BytesIO
 
         for page_num, page_image in enumerate(page_images):
-            print(f"  Adding page {page_num + 1}/{total_pages} as image...")
+            # Log progress at milestones (first page, every 10th page, and last page)
+            if page_num == 0 or (page_num + 1) % 10 == 0 or page_num == total_pages - 1:
+                print(f"  Processing pages... ({page_num + 1}/{total_pages})")
 
             # Determine which source section this page belongs to
             # For simplicity, we'll map linearly if we have fewer sections than pages
@@ -464,8 +506,9 @@ class DocumentProcessor:
                     img_height = available_height
                     img_width = img_height / img_aspect_ratio
 
-                print(f"    Page {page_num + 1}: {page_width/Inches(1):.2f}\" x {page_height/Inches(1):.2f}\", "
-                      f"image: {img_width/Inches(1):.2f}\" x {img_height/Inches(1):.2f}\"")
+                # Verbose dimension logging (disabled for production)
+                # print(f"    Page {page_num + 1}: {page_width/Inches(1):.2f}\" x {page_height/Inches(1):.2f}\", "
+                #       f"image: {img_width/Inches(1):.2f}\" x {img_height/Inches(1):.2f}\"")
             else:
                 # Default to letter size
                 img_width = Inches(6.5)
@@ -505,7 +548,8 @@ class DocumentProcessor:
                     section.page_height = source_section.page_height
                     section.page_width = source_section.page_width
                     section.orientation = source_section.orientation
-                    print(f"  Section {section_idx}: {section.page_width/Inches(1):.2f}\" x {section.page_height/Inches(1):.2f}\", orientation: {section.orientation}")
+                    # Verbose dimension logging (disabled for production)
+                    # print(f"  Section {section_idx}: {section.page_width/Inches(1):.2f}\" x {section.page_height/Inches(1):.2f}\", orientation: {section.orientation}")
                 except Exception as e:
                     print(f"Warning: Could not copy page setup for section {section_idx}: {e}")
 
@@ -769,21 +813,6 @@ class DocumentProcessor:
         # Save document
         doc.save(output_file)
         print(f"Saved document with header/footer to: {output_file}")
-
-        # Also save a copy to the output folder for inspection
-        import shutil
-        from pathlib import Path
-        # Get the webapp output directory
-        webapp_dir = Path(__file__).parent.parent
-        output_folder = webapp_dir / "output"
-        output_folder.mkdir(parents=True, exist_ok=True)
-        debug_copy = output_folder / "DEBUG_translation_with_header.docx"
-        try:
-            shutil.copy2(output_file, debug_copy)
-            print(f"DEBUG: Saved copy for inspection at: {debug_copy}")
-            print(f"DEBUG: Please open this file in Word to check if blank page 2 exists there")
-        except Exception as e:
-            print(f"DEBUG: Failed to save debug copy: {e}")
 
     def _add_page_number(self, paragraph):
         """Add PAGE field to paragraph for current page number"""
