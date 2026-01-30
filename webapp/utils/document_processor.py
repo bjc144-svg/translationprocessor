@@ -592,7 +592,7 @@ class DocumentProcessor:
                 left_para.runs[0].font.size = Pt(9)  # Reduced from 10
                 print(f"Warning: {logo_name} logo file not found at: {logo_path}")
 
-            # Right cell - Contact info
+            # Right cell - Contact info (skip for EEI - logo already includes it)
             right_cell = header_table.rows[0].cells[1]
             right_cell.vertical_alignment = 1  # Center vertically
 
@@ -607,24 +607,25 @@ class DocumentProcessor:
                 tcMar.append(node)
             tcPr.append(tcMar)
 
-            # Add contact info (right-aligned)
-            contact_lines = [
-                "212-581-8877",
-                "eval@parkeval.com",
-                "www.parkeval.com"
-            ]
+            # Add contact info (right-aligned) - skip for EEI division
+            if division != 'EEI':
+                contact_lines = [
+                    "212-581-8877",
+                    "eval@parkeval.com",
+                    "www.parkeval.com"
+                ]
 
-            for i, line in enumerate(contact_lines):
-                if i > 0:
-                    right_cell.add_paragraph()
-                para = right_cell.paragraphs[i] if i == 0 else right_cell.paragraphs[-1]
-                para.text = line
-                para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-                # Remove paragraph spacing for tight alignment
-                para.paragraph_format.space_before = Pt(0)
-                para.paragraph_format.space_after = Pt(0)
-                run = para.runs[0]
-                run.font.size = Pt(9)  # Reduced from 10
+                for i, line in enumerate(contact_lines):
+                    if i > 0:
+                        right_cell.add_paragraph()
+                    para = right_cell.paragraphs[i] if i == 0 else right_cell.paragraphs[-1]
+                    para.text = line
+                    para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                    # Remove paragraph spacing for tight alignment
+                    para.paragraph_format.space_before = Pt(0)
+                    para.paragraph_format.space_after = Pt(0)
+                    run = para.runs[0]
+                    run.font.size = Pt(9)  # Reduced from 10
 
             # Add horizontal line after header using border
             line_para = header.add_paragraph()
