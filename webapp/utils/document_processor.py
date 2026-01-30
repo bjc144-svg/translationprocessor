@@ -142,576 +142,155 @@ class DocumentProcessor:
             traceback.print_exc()
             return False
 
+    def _convert_docx_to_images(self, docx_path, dpi=150):
+        """
+        Convert .docx pages to images using LibreOffice and pdf2image.
+
+        Args:
+            docx_path: Path to .docx file
+            dpi: Resolution for images (default 150 for good quality/size balance)
+
+        Returns:
+            List of PIL Image objects, one per page
+        """
+        import subprocess
+        from pdf2image import convert_from_path
+        from pathlib import Path
+
+        print(f"Converting {docx_path} to images...")
+
+        # Create temporary directory for conversion
+        temp_dir = Path(tempfile.mkdtemp(prefix='docx2img_'))
+
+        try:
+            # Step 1: Convert .docx to PDF using LibreOffice
+            pdf_path = temp_dir / "temp.pdf"
+
+            print(f"  Step 1: Converting .docx to PDF...")
+            result = subprocess.run([
+                'libreoffice',
+                '--headless',  # Run without GUI
+                '--convert-to', 'pdf',
+                '--outdir', str(temp_dir),
+                str(docx_path)
+            ], capture_output=True, text=True, timeout=60)
+
+            if result.returncode != 0:
+                raise Exception(f"LibreOffice conversion failed: {result.stderr}")
+
+            # LibreOffice names the output file based on input filename
+            docx_filename = Path(docx_path).stem
+            pdf_path = temp_dir / f"{docx_filename}.pdf"
+
+            if not pdf_path.exists():
+                raise Exception(f"PDF not created at expected path: {pdf_path}")
+
+            print(f"  Step 2: Converting PDF pages to images (DPI={dpi})...")
+            # Step 2: Convert PDF pages to images
+            images = convert_from_path(
+                str(pdf_path),
+                dpi=dpi,
+                fmt='png',  # PNG for better quality
+                thread_count=2  # Use multiple threads for faster conversion
+            )
+
+            print(f"  ✓ Converted {len(images)} pages to images")
+            return images
+
+        except subprocess.TimeoutExpired:
+            raise Exception("LibreOffice conversion timed out after 60 seconds")
+        except Exception as e:
+            print(f"  ✗ Error converting to images: {e}")
+            raise
+        finally:
+            # Clean up temporary directory
+            try:
+                shutil.rmtree(temp_dir)
+            except Exception as e:
+                print(f"Warning: Could not clean up temp directory {temp_dir}: {e}")
+
     def add_header_footer(self, input_file, output_file, metadata):
-        """Add header and footer to translation document"""
+        """Add header and footer to translation document using page-to-image conversion"""
 
-        # Open document
-        original_doc = Document(input_file)
+        print("Converting source document pages to images for perfect visual preservation...")
 
-        # IMPORTANT: Create a new document with a single section to ensure correct page numbering
-        # If the document has multiple sections, SECTIONPAGES will only count pages in each individual section
-        # By creating a new document with all content in one section, SECTIONPAGES will count all pages
-        print(f"Original document has {len(original_doc.sections)} section(s)")
+        # Convert source document pages to images
+        page_images = self._convert_docx_to_images(input_file, dpi=150)
+        total_pages = len(page_images)
 
-        # Debug: Analyze source document's Section 1 to find where images are
-        print("\n" + "=" * 60)
-        print("DEBUG: Analyzing SOURCE document structure...")
-        w_ns = '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}'
+        print(f"Converted {total_pages} pages to images. Creating new document with headers/footers...")
 
-        # Find all body elements and categorize them
-        source_elements = []
-        section_idx = 0
-        for element in original_doc.element.body:
-            tag = element.tag.split('}')[-1] if '}' in element.tag else element.tag
-            source_elements.append(tag)
-
-            # Check if this ends a section
-            if tag == 'p':
-                pPr = element.find(f'{w_ns}pPr')
-                if pPr is not None and pPr.find(f'{w_ns}sectPr') is not None:
-                    print(f"SOURCE: Section {section_idx} ends at element with tag '{tag}'")
-                    section_idx += 1
-
-        print(f"SOURCE: Total body elements: {len(source_elements)}")
-        print(f"SOURCE: Element types: {', '.join(set(source_elements))}")
-
-        # Check SOURCE Section 1 paragraphs for drawings
-        print("\nDEBUG: Checking SOURCE Section 1 for images/drawings...")
-        section_1_start_idx = None
-        current_section_idx = 0
-
-        for elem_idx, element in enumerate(original_doc.element.body):
-            tag = element.tag.split('}')[-1] if '}' in element.tag else element.tag
-            if tag == 'p':
-                pPr = element.find(f'{w_ns}pPr')
-                if pPr is not None and pPr.find(f'{w_ns}sectPr') is not None:
-                    current_section_idx += 1
-                    if current_section_idx == 1:
-                        section_1_start_idx = elem_idx + 1
-                        break
-
-        if section_1_start_idx is not None:
-            print(f"SOURCE: Section 1 starts at element index {section_1_start_idx}")
-            print("SOURCE: All paragraphs in Section 1 (showing only those with images or text):")
-            para_count = 0
-            drawing_ns = '{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}'
-            pic_ns = '{http://schemas.openxmlformats.org/drawingml/2006/picture}'
-            vml_ns = 'urn:schemas-microsoft-com:vml'
-
-            for elem_idx, element in enumerate(original_doc.element.body):
-                if elem_idx >= section_1_start_idx:
-                    tag = element.tag.split('}')[-1] if '}' in element.tag else element.tag
-                    if tag == 'p':
-                        # Check for all image formats
-                        drawings = element.findall(f'.//{drawing_ns}inline') + element.findall(f'.//{drawing_ns}anchor')
-                        pics = element.findall(f'.//{pic_ns}pic')
-                        vml_shapes = element.findall(f'.//{{{vml_ns}}}shape') + element.findall(f'.//{{{vml_ns}}}imagedata')
-                        pict_elements = element.findall(f'.//{w_ns}pict')
-
-                        text_nodes = element.findall(f'.//{w_ns}t')
-                        text = ''.join([t.text or '' for t in text_nodes])
-
-                        total = len(drawings) + len(pics) + len(vml_shapes) + len(pict_elements)
-                        has_images = total > 0
-                        has_text = len(text) > 0
-
-                        # Only print paragraphs with images or text (skip empty ones)
-                        if has_images or has_text:
-                            image_info = f" [HAS {len(drawings)} drawings, {len(pics)} pics, {len(vml_shapes)} VML, {len(pict_elements)} pict]" if has_images else " [NO IMAGES]"
-                            print(f"  SOURCE Para {para_count}: text_len={len(text)}{image_info}")
-
-                            # If this paragraph has VML shapes, check their positioning
-                            if len(vml_shapes) > 0:
-                                print(f"    SOURCE VML positioning for Para {para_count}:")
-                                for vml_idx, vml_shape in enumerate(vml_shapes):
-                                    style = vml_shape.get('style')
-                                    print(f"      VML {vml_idx}: style='{style}'")
-
-                        para_count += 1
-                    elif tag == 'sectPr':
-                        # Reached end of Section 1
-                        break
-
-            print(f"  SOURCE: Total {para_count} paragraphs in Section 1")
-
-        print("=" * 60 + "\n")
-
-        # Create a new document to consolidate content
+        # Create a new document
         doc = Document()
 
         # Remove the initial empty paragraph that Document() creates
-        # This prevents a blank first page
         if doc.paragraphs:
             for para in list(doc.paragraphs):
-                # Remove empty paragraphs
                 p_element = para._element
                 p_element.getparent().remove(p_element)
 
-        # Remove the target document's final sectPr since we'll be copying section structure from source
-        # This prevents an extra empty section at the end
-        body = doc.element.body
-        w_ns = '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}'
-        final_sectPr = body.find(f'{w_ns}sectPr')
-        if final_sectPr is not None:
-            body.remove(final_sectPr)
-            print("Removed target document's initial sectPr to prepare for source section structure")
-
-        # Copy document body using deep copy to preserve all element types
-        # This will preserve section breaks, allowing different pages to have different setups
-        self._copy_document_body(original_doc, doc)
-
-        print(f"Original document had {len(original_doc.sections)} section(s)")
-        print(f"Target document now has {len(doc.sections)} section(s)")
-
-        # Remove only TRAILING empty paragraphs (those at end of sections with no content after)
-        # Preserve empty paragraphs BETWEEN content paragraphs to maintain spacing
-        print("\nRemoving trailing empty paragraphs to prevent blank pages...")
-        w_ns = '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}'
-        drawing_ns = '{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}'
-        pic_ns = '{http://schemas.openxmlformats.org/drawingml/2006/picture}'
-        vml_ns = 'urn:schemas-microsoft-com:vml'
-
-        # First pass: identify which paragraphs have content
-        elements_list = list(doc.element.body)
-        has_content_map = {}  # element -> bool
-
-        for elem_idx, element in enumerate(elements_list):
-            tag = element.tag.split('}')[-1] if '}' in element.tag else element.tag
-
-            if tag == 'p':
-                # Check if this paragraph ends a section (contains sectPr)
-                pPr = element.find(f'{w_ns}pPr')
-                is_section_end = pPr is not None and pPr.find(f'{w_ns}sectPr') is not None
-
-                # Check for text content
-                text_nodes = element.findall(f'.//{w_ns}t')
-                text = ''.join([t.text or '' for t in text_nodes])
-
-                # Check for images (all formats)
-                drawings = element.findall(f'.//{drawing_ns}inline') + element.findall(f'.//{drawing_ns}anchor')
-                pics = element.findall(f'.//{pic_ns}pic')
-                vml_shapes = element.findall(f'.//{{{vml_ns}}}shape') + element.findall(f'.//{{{vml_ns}}}imagedata')
-                pict_elements = element.findall(f'.//{w_ns}pict')
-
-                has_content = len(text) > 0 or len(drawings) > 0 or len(pics) > 0 or len(vml_shapes) > 0 or len(pict_elements) > 0
-                has_content_map[elem_idx] = (has_content, is_section_end)
-
-        # Second pass: identify trailing empty paragraphs (no content after them in same section)
-        paragraphs_to_remove = []
-        for elem_idx, element in enumerate(elements_list):
-            tag = element.tag.split('}')[-1] if '}' in element.tag else element.tag
-
-            if tag == 'p' and elem_idx in has_content_map:
-                has_content, is_section_end = has_content_map[elem_idx]
-
-                # Don't remove section-ending paragraphs
-                if is_section_end:
-                    continue
-
-                # If this paragraph has no content, check if there's any content after it
-                if not has_content:
-                    has_content_after = False
-                    for future_idx in range(elem_idx + 1, len(elements_list)):
-                        future_elem = elements_list[future_idx]
-                        future_tag = future_elem.tag.split('}')[-1] if '}' in future_elem.tag else future_elem.tag
-
-                        # Stop at section boundary
-                        if future_tag == 'p' and future_idx in has_content_map:
-                            future_has_content, future_is_section_end = has_content_map[future_idx]
-                            if future_is_section_end:
-                                # Reached section end, no more content possible
-                                break
-                            if future_has_content:
-                                # Found content after this empty paragraph
-                                has_content_after = True
-                                break
-                        elif future_tag == 'sectPr':
-                            # Reached end of document
-                            break
-
-                    # Only remove if this is a trailing empty (no content after it)
-                    if not has_content_after:
-                        paragraphs_to_remove.append(element)
-
-        # Remove the trailing empty paragraphs
-        for para_element in paragraphs_to_remove:
-            para_element.getparent().remove(para_element)
-
-        print(f"Removed {len(paragraphs_to_remove)} trailing empty paragraphs (preserved spacing between content)")
-
-        # Debug: Check content distribution across sections
-        print("=" * 60)
-        print("SECTION CONTENT ANALYSIS:")
-
-        w_ns = '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}'
-
-        # Track content per section
-        section_contents = []  # List of dicts: {'paragraphs': count, 'tables': count}
-        current_section = {'paragraphs': 0, 'tables': 0}
-
-        for element in doc.element.body:
-            tag = element.tag.split('}')[-1] if '}' in element.tag else element.tag
-
-            if tag == 'p':
-                current_section['paragraphs'] += 1
-                # Check if this paragraph has sectPr (marks end of this section)
-                pPr = element.find(f'{w_ns}pPr')
-                if pPr is not None and pPr.find(f'{w_ns}sectPr') is not None:
-                    # This paragraph ends the current section
-                    section_contents.append(current_section)
-                    current_section = {'paragraphs': 0, 'tables': 0}
-                    print(f"  Found section break in paragraph (ends Section {len(section_contents) - 1})")
-            elif tag == 'tbl':
-                current_section['tables'] += 1
-            elif tag == 'sectPr':
-                # Final sectPr - marks end of last section
-                section_contents.append(current_section)
-                print(f"  Found final sectPr (ends Section {len(section_contents) - 1})")
-
-        # Print summary
-        for idx, content in enumerate(section_contents):
-            print(f"  Section {idx}: {content['paragraphs']} paragraphs, {content['tables']} tables")
-
-        if len(section_contents) != len(doc.sections):
-            print(f"  WARNING: Content analysis found {len(section_contents)} sections, but python-docx reports {len(doc.sections)} sections!")
-
-        # Debug: Check Section 0's table for images (might be where page 2 images are!)
-        print("\nDEBUG: Analyzing Section 0's table for images...")
-        drawing_ns = '{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}'
-        pic_ns = '{http://schemas.openxmlformats.org/drawingml/2006/picture}'
-
-        section_0_table_found = False
-        for elem_idx, element in enumerate(doc.element.body):
-            tag = element.tag.split('}')[-1] if '}' in element.tag else element.tag
-
-            # Stop when we hit the section break (end of Section 0)
-            if tag == 'p':
-                pPr = element.find(f'{w_ns}pPr')
-                if pPr is not None and pPr.find(f'{w_ns}sectPr') is not None:
-                    break
-
-            # Check if this is a table
-            if tag == 'tbl' and not section_0_table_found:
-                section_0_table_found = True
-                print(f"  Found table in Section 0 at element index {elem_idx}")
-
-                # Count rows and cells
-                rows = element.findall(f'.//{w_ns}tr')
-                print(f"    Total rows: {len(rows)}")
-
-                # Check each cell for images (all formats)
-                vml_ns = 'urn:schemas-microsoft-com:vml'
-                total_images = 0
-                cells_with_images = []
-                for row_idx, row in enumerate(rows):
-                    cells = row.findall(f'.//{w_ns}tc')
-                    for cell_idx, cell in enumerate(cells):
-                        # Check for DrawingML images (modern format)
-                        drawings = cell.findall(f'.//{drawing_ns}inline') + cell.findall(f'.//{drawing_ns}anchor')
-                        pics = cell.findall(f'.//{pic_ns}pic')
-
-                        # Check for VML shapes (legacy format)
-                        vml_shapes = cell.findall(f'.//{{{vml_ns}}}shape') + cell.findall(f'.//{{{vml_ns}}}imagedata')
-
-                        # Check for w:pict elements (picture containers)
-                        pict_elements = cell.findall(f'.//{w_ns}pict')
-
-                        total_in_cell = len(drawings) + len(pics) + len(vml_shapes) + len(pict_elements)
-                        if total_in_cell > 0:
-                            total_images += total_in_cell
-                            cells_with_images.append((row_idx, cell_idx, len(drawings), len(pics), len(vml_shapes), len(pict_elements)))
-
-                if total_images > 0:
-                    print(f"    ** Table contains {total_images} total images! **")
-                    for row_idx, cell_idx, n_drawings, n_pics, n_vml, n_pict in cells_with_images:
-                        print(f"      Cell[{row_idx}][{cell_idx}]: {n_drawings} drawings, {n_pics} pics, {n_vml} VML, {n_pict} pict")
-                else:
-                    print(f"    No images found in this table")
-
-                # Check table properties that might affect layout
-                print(f"  Checking table layout properties...")
-                tblPr = element.find(f'{w_ns}tblPr')
-                if tblPr is not None:
-                    # Check table layout
-                    tblLayout = tblPr.find(f'{w_ns}tblLayout')
-                    if tblLayout is not None:
-                        layout_type = tblLayout.get(f'{w_ns}type')
-                        print(f"    Table layout type: {layout_type}")
-
-                # Check if any rows have cantSplit (prevents row from breaking across pages)
-                cant_split_rows = []
-                for row_idx, row in enumerate(rows):
-                    trPr = row.find(f'{w_ns}trPr')
-                    if trPr is not None:
-                        cantSplit = trPr.find(f'{w_ns}cantSplit')
-                        if cantSplit is not None:
-                            val = cantSplit.get(f'{w_ns}val')
-                            # cantSplit defaults to true if present, unless explicitly set to "0" or "false"
-                            if val not in ('0', 'false'):
-                                cant_split_rows.append(row_idx)
-
-                if cant_split_rows:
-                    print(f"    WARNING: {len(cant_split_rows)} rows have cantSplit=true (can't break across pages)")
-                    print(f"    Row indices: {cant_split_rows[:10]}..." if len(cant_split_rows) > 10 else f"    Row indices: {cant_split_rows}")
-                else:
-                    print(f"    No rows with cantSplit property")
-
-        # Debug: Check Section 0's paragraphs after the table
-        print("\nDEBUG: Analyzing Section 0 paragraphs after the table...")
-        drawing_ns = '{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}'
-        pic_ns = '{http://schemas.openxmlformats.org/drawingml/2006/picture}'
-        vml_ns = 'urn:schemas-microsoft-com:vml'
-
-        section_0_para_count = 0
-        for elem_idx, element in enumerate(doc.element.body):
-            tag = element.tag.split('}')[-1] if '}' in element.tag else element.tag
-
-            if tag == 'p':
-                # Check if this ends Section 0
-                pPr = element.find(f'{w_ns}pPr')
-                if pPr is not None and pPr.find(f'{w_ns}sectPr') is not None:
-                    print(f"  Para {section_0_para_count} (ENDS SECTION 0)")
-                    break
-
-                # Only analyze paragraphs after the table (after element 0)
-                if elem_idx > 0 and section_0_para_count < 10:  # Print first 10 paras after table
-                    # Get text content
-                    text_nodes = element.findall(f'.//{w_ns}t')
-                    text = ''.join([t.text or '' for t in text_nodes])
-
-                    # Check for images (all formats)
-                    drawings = element.findall(f'.//{drawing_ns}inline') + element.findall(f'.//{drawing_ns}anchor')
-                    pics = element.findall(f'.//{pic_ns}pic')
-                    vml_shapes = element.findall(f'.//{{{vml_ns}}}shape') + element.findall(f'.//{{{vml_ns}}}imagedata')
-                    pict_elements = element.findall(f'.//{w_ns}pict')
-
-                    total = len(drawings) + len(pics) + len(vml_shapes) + len(pict_elements)
-                    has_images = total > 0
-                    image_info = f" [HAS {total} images]" if has_images else " [NO IMAGES]"
-
-                    # Check for pageBreakBefore
-                    page_break_before = False
-                    if pPr is not None:
-                        if pPr.find(f'{w_ns}pageBreakBefore') is not None:
-                            page_break_before = True
-
-                    pb_info = " [PAGE BREAK BEFORE!]" if page_break_before else ""
-
-                    print(f"  Para {section_0_para_count}: text_len={len(text)}{image_info}{pb_info}")
-
-                section_0_para_count += 1
-            elif tag == 'tbl':
-                # Skip the table
-                pass
-
-        print(f"  Total: {section_0_para_count} paragraphs in Section 0 (after table)")
-
-        # Debug: Check actual text content in Section 1 paragraphs
-        print("\nDEBUG: Analyzing Section 1 paragraph content...")
-        section_1_start_idx = None
-        current_section_idx = 0
-
-        for elem_idx, element in enumerate(doc.element.body):
-            tag = element.tag.split('}')[-1] if '}' in element.tag else element.tag
-
-            if tag == 'p':
-                # Check if this ends a section
-                pPr = element.find(f'{w_ns}pPr')
-                if pPr is not None and pPr.find(f'{w_ns}sectPr') is not None:
-                    current_section_idx += 1
-                    if current_section_idx == 1:
-                        section_1_start_idx = elem_idx + 1
-                        print(f"DEBUG: Section 1 starts at element index {section_1_start_idx}")
-                        break
-
-        # Now analyze Section 1 content in detail
-        if section_1_start_idx is not None:
-            print("DEBUG: Analyzing Section 1 content in detail...")
-
-            drawing_ns = '{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}'
-            pic_ns = '{http://schemas.openxmlformats.org/drawingml/2006/picture}'
-            vml_ns = 'urn:schemas-microsoft-com:vml'
-
-            para_count = 0
-            table_count = 0
-            section_ended = False
-
-            for elem_idx, element in enumerate(doc.element.body):
-                if elem_idx >= section_1_start_idx and not section_ended:
-                    tag = element.tag.split('}')[-1] if '}' in element.tag else element.tag
-
-                    if tag == 'p':
-                        # Check if this paragraph ends the section
-                        pPr = element.find(f'{w_ns}pPr')
-                        if pPr is not None and pPr.find(f'{w_ns}sectPr') is not None:
-                            section_ended = True
-                            print(f"DEBUG: Section 1 ends after {para_count} paragraphs and {table_count} tables")
-                            break
-
-                        if para_count < 5:  # Only print first 5 paragraphs
-                            # Get text content
-                            text_nodes = element.findall(f'.//{w_ns}t')
-                            text = ''.join([t.text or '' for t in text_nodes])
-
-                            # Check for images/drawings (all formats)
-                            drawings = element.findall(f'.//{drawing_ns}inline') + element.findall(f'.//{drawing_ns}anchor')
-                            pics = element.findall(f'.//{pic_ns}pic')
-                            vml_shapes = element.findall(f'.//{{{vml_ns}}}shape') + element.findall(f'.//{{{vml_ns}}}imagedata')
-                            pict_elements = element.findall(f'.//{w_ns}pict')
-
-                            total = len(drawings) + len(pics) + len(vml_shapes) + len(pict_elements)
-                            has_images = total > 0
-                            image_info = f" [HAS {len(drawings)} drawings, {len(pics)} pics, {len(vml_shapes)} VML, {len(pict_elements)} pict]" if has_images else " [NO IMAGES]"
-
-                            # Check paragraph properties in detail
-                            pPr_props = []
-                            if pPr is not None:
-                                # Check for page break before
-                                if pPr.find(f'{w_ns}pageBreakBefore') is not None:
-                                    pPr_props.append("pageBreakBefore")
-                                # Check for keep with next
-                                if pPr.find(f'{w_ns}keepNext') is not None:
-                                    pPr_props.append("keepNext")
-                                # Check for keep lines together
-                                if pPr.find(f'{w_ns}keepLines') is not None:
-                                    pPr_props.append("keepLines")
-                                # Check for widow control
-                                if pPr.find(f'{w_ns}widowControl') is not None:
-                                    pPr_props.append("widowControl")
-                                # Check spacing before/after
-                                spacing = pPr.find(f'{w_ns}spacing')
-                                if spacing is not None:
-                                    before = spacing.get(f'{w_ns}before')
-                                    after = spacing.get(f'{w_ns}after')
-                                    if before:
-                                        pPr_props.append(f"spacingBefore={before}")
-                                    if after:
-                                        pPr_props.append(f"spacingAfter={after}")
-
-                            props_info = f" [Props: {', '.join(pPr_props)}]" if pPr_props else " [No special props]"
-
-                            print(f"  Para {para_count}: text_len={len(text)}{image_info}{props_info}")
-
-                            # If this paragraph has VML shapes, check their positioning
-                            if len(vml_shapes) > 0:
-                                print(f"    VML positioning details for Para {para_count}:")
-                                for vml_idx, vml_shape in enumerate(vml_shapes):
-                                    style = vml_shape.get('style')
-                                    print(f"      VML {vml_idx}: style='{style}'")
-
-                        para_count += 1
-
-                    elif tag == 'tbl':
-                        # Found a table in Section 1! Examine it for images
-                        print(f"  TABLE {table_count} in Section 1:")
-
-                        # Count rows and cells
-                        rows = element.findall(f'.//{w_ns}tr')
-                        print(f"    Rows: {len(rows)}")
-
-                        # Check each cell for images (all formats)
-                        total_images_in_table = 0
-                        for row_idx, row in enumerate(rows):
-                            cells = row.findall(f'.//{w_ns}tc')
-                            for cell_idx, cell in enumerate(cells):
-                                # Check for all image types
-                                drawings = cell.findall(f'.//{drawing_ns}inline') + cell.findall(f'.//{drawing_ns}anchor')
-                                pics = cell.findall(f'.//{pic_ns}pic')
-                                vml_shapes = cell.findall(f'.//{{{vml_ns}}}shape') + cell.findall(f'.//{{{vml_ns}}}imagedata')
-                                pict_elements = cell.findall(f'.//{w_ns}pict')
-
-                                total_in_cell = len(drawings) + len(pics) + len(vml_shapes) + len(pict_elements)
-                                if total_in_cell > 0:
-                                    total_images_in_table += total_in_cell
-                                    print(f"      Cell[{row_idx}][{cell_idx}]: {len(drawings)} drawings, {len(pics)} pics, {len(vml_shapes)} VML, {len(pict_elements)} pict")
-
-                        if total_images_in_table > 0:
-                            print(f"    ** TABLE {table_count} contains {total_images_in_table} total images! **")
-                        else:
-                            print(f"    No images found in this table")
-
-                        table_count += 1
-
-                    elif tag == 'sectPr':
-                        # Final sectPr - ends Section 1
-                        section_ended = True
-                        print(f"DEBUG: Section 1 ends (final sectPr) after {para_count} paragraphs and {table_count} tables")
-                        break
-
-        # Debug: Check the paragraph that ENDS Section 0 (contains sectPr for section break)
-        print("\nDEBUG: Analyzing the paragraph that ends Section 0...")
-        for elem_idx, element in enumerate(doc.element.body):
-            tag = element.tag.split('}')[-1] if '}' in element.tag else element.tag
-            if tag == 'p':
-                pPr = element.find(f'{w_ns}pPr')
-                if pPr is not None:
-                    sectPr_in_para = pPr.find(f'{w_ns}sectPr')
-                    if sectPr_in_para is not None:
-                        # This paragraph ends Section 0
-                        print(f"  Found section break at paragraph (element {elem_idx})")
-
-                        # Check the section break type
-                        type_elem = sectPr_in_para.find(f'{w_ns}type')
-                        if type_elem is not None:
-                            break_type = type_elem.get(f'{w_ns}val')
-                            print(f"  Section break type: {break_type}")
-                        else:
-                            print(f"  Section break type: (default = nextPage)")
-
-                        # Check if this paragraph has any content
-                        text_nodes = element.findall(f'.//{w_ns}t')
-                        text = ''.join([t.text or '' for t in text_nodes])
-                        print(f"  Paragraph text length: {len(text)}")
-
-                        # Check paragraph properties
-                        if pPr.find(f'{w_ns}pageBreakBefore') is not None:
-                            print(f"  WARNING: Has pageBreakBefore property!")
-                        if pPr.find(f'{w_ns}keepNext') is not None:
-                            print(f"  Has keepNext property")
-
-                        break  # Only check the first section break
-
-        print("=" * 60)
-
-        # Copy page setup (margins, size, orientation) from each source section to corresponding target section
-        for idx, target_section in enumerate(doc.sections):
-            if idx < len(original_doc.sections):
-                source_section = original_doc.sections[idx]
-
-                # Copy all margin settings
-                target_section.top_margin = source_section.top_margin
-                target_section.bottom_margin = source_section.bottom_margin
-                target_section.left_margin = source_section.left_margin
-                target_section.right_margin = source_section.right_margin
-                target_section.gutter = source_section.gutter
-
-                # Copy page size and orientation
-                target_section.page_height = source_section.page_height
-                target_section.page_width = source_section.page_width
-                target_section.orientation = source_section.orientation
-
-                # Check and fix section break type
-                # Section breaks can be: nextPage, evenPage, oddPage, continuous
-                # If set to evenPage or oddPage, it can cause blank pages
-                sectPr = target_section._sectPr
-                type_elem = sectPr.find(qn('w:type'))
-                if type_elem is not None:
-                    current_type = type_elem.get(qn('w:val'))
-                    print(f"Section {idx}: Current break type = {current_type}")
-                    if current_type in ('evenPage', 'oddPage'):
-                        print(f"  WARNING: Section {idx} has '{current_type}' break type which can cause blank pages!")
-                        print(f"  Changing to 'nextPage' to prevent blank pages")
-                        type_elem.set(qn('w:val'), 'nextPage')
-                else:
-                    print(f"Section {idx}: No type element found (default is nextPage)")
-
-                print(f"Section {idx}: Copied page setup - Height: {target_section.page_height}, Width: {target_section.page_width}, Orientation: {target_section.orientation}")
-            else:
-                # More target sections than source sections (shouldn't happen, but handle gracefully)
-                print(f"Warning: Target section {idx} has no corresponding source section")
+        # Get page setup from original document (for first section at least)
+        original_doc = Document(input_file)
+        source_section = original_doc.sections[0] if original_doc.sections else None
+
+        # Add each page image to the document
+        from io import BytesIO
+
+        for page_num, page_image in enumerate(page_images):
+            print(f"  Adding page {page_num + 1}/{total_pages} as image...")
+
+            # Save image to bytes
+            img_bytes = BytesIO()
+            page_image.save(img_bytes, format='PNG')
+            img_bytes.seek(0)
+
+            # Add paragraph with full-page image
+            # Set image width to match page content width (accounting for margins)
+            # Standard letter page is 8.5" wide with 1" margins on each side = 6.5" content width
+            para = doc.add_paragraph()
+            para.paragraph_format.space_before = Pt(0)
+            para.paragraph_format.space_after = Pt(0)
+            para.paragraph_format.line_spacing = 1.0
+            run = para.add_run()
+
+            # Add the image - use width to match page content area
+            # The image will maintain its aspect ratio
+            run.add_picture(img_bytes, width=Inches(6.5))
+
+            # Add section break after this page (except for the last page)
+            if page_num < total_pages - 1:
+                # Add section break to start a new page
+                para_elem = para._element
+                pPr = para_elem.get_or_add_pPr()
+                sectPr = OxmlElement('w:sectPr')
+                pPr.append(sectPr)
+
+                # Set section break type to nextPage
+                sectType = OxmlElement('w:type')
+                sectType.set(qn('w:val'), 'nextPage')
+                sectPr.append(sectType)
+
+        print(f"Added {total_pages} page images to document")
+        print(f"Document now has {len(doc.sections)} section(s)")
+
+        # Copy page setup from source document if available
+        if source_section:
+            print("Copying page setup from source document...")
+            for section in doc.sections:
+                try:
+                    section.top_margin = source_section.top_margin
+                    section.bottom_margin = source_section.bottom_margin
+                    section.left_margin = source_section.left_margin
+                    section.right_margin = source_section.right_margin
+                    section.page_height = source_section.page_height
+                    section.page_width = source_section.page_width
+                    section.orientation = source_section.orientation
+                except Exception as e:
+                    print(f"Warning: Could not copy all page setup properties: {e}")
 
         # Apply header/footer to ALL sections
-        for section in doc.sections:
+        print("Adding headers and footers to all sections...")
+        for section_idx, section in enumerate(doc.sections):
             # Minimize header/footer distances to maximize content area
             section.header_distance = Inches(0.15)  # Minimal distance from top
             section.footer_distance = Inches(0.15)  # Minimal distance from bottom
