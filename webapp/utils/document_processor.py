@@ -607,13 +607,14 @@ class DocumentProcessor:
                 tcMar.append(node)
             tcPr.append(tcMar)
 
-            # Add contact info (right-aligned) - skip for EEI division
+            # Add contact info (right-aligned) - EEI has different contact info and color
             if division != 'EEI':
                 contact_lines = [
                     "212-581-8877",
                     "eval@parkeval.com",
                     "www.parkeval.com"
                 ]
+                contact_color = None  # Use default color
 
                 for i, line in enumerate(contact_lines):
                     if i > 0:
@@ -626,6 +627,26 @@ class DocumentProcessor:
                     para.paragraph_format.space_after = Pt(0)
                     run = para.runs[0]
                     run.font.size = Pt(9)  # Reduced from 10
+            else:
+                # EEI-specific contact info with custom color
+                contact_lines = [
+                    "www.educei.com",
+                    "eval@educei.com"
+                ]
+                contact_color = RGBColor(0xB5, 0x2B, 0x46)  # #B52B46
+
+                for i, line in enumerate(contact_lines):
+                    if i > 0:
+                        right_cell.add_paragraph()
+                    para = right_cell.paragraphs[i] if i == 0 else right_cell.paragraphs[-1]
+                    para.text = line
+                    para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                    # Remove paragraph spacing for tight alignment
+                    para.paragraph_format.space_before = Pt(0)
+                    para.paragraph_format.space_after = Pt(0)
+                    run = para.runs[0]
+                    run.font.size = Pt(9)
+                    run.font.color.rgb = contact_color
 
             # Add horizontal line after header using border
             line_para = header.add_paragraph()
