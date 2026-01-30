@@ -142,6 +142,64 @@ class DocumentProcessor:
             traceback.print_exc()
             return False
 
+    def _find_libreoffice(self):
+        """
+        Find LibreOffice executable path (cross-platform).
+
+        Returns:
+            Path to LibreOffice executable, or None if not found
+        """
+        import platform
+        import subprocess
+        from pathlib import Path
+
+        system = platform.system()
+
+        if system == 'Windows':
+            # Common LibreOffice installation paths on Windows
+            possible_paths = [
+                r"C:\Program Files\LibreOffice\program\soffice.exe",
+                r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
+                Path(os.environ.get('PROGRAMFILES', 'C:\\Program Files')) / 'LibreOffice' / 'program' / 'soffice.exe',
+                Path(os.environ.get('PROGRAMFILES(X86)', 'C:\\Program Files (x86)')) / 'LibreOffice' / 'program' / 'soffice.exe',
+            ]
+
+            for path in possible_paths:
+                if isinstance(path, str):
+                    path = Path(path)
+                if path.exists():
+                    print(f"  Found LibreOffice at: {path}")
+                    return str(path)
+
+            return None
+
+        elif system == 'Linux' or system == 'Darwin':  # Darwin is macOS
+            # On Linux/Mac, try to find in PATH
+            try:
+                result = subprocess.run(['which', 'libreoffice'],
+                                      capture_output=True, text=True, timeout=5)
+                if result.returncode == 0 and result.stdout.strip():
+                    return result.stdout.strip()
+
+                # Alternative name on some systems
+                result = subprocess.run(['which', 'soffice'],
+                                      capture_output=True, text=True, timeout=5)
+                if result.returncode == 0 and result.stdout.strip():
+                    return result.stdout.strip()
+            except:
+                pass
+
+            # Try common paths
+            common_paths = ['/usr/bin/libreoffice', '/usr/bin/soffice',
+                          '/usr/local/bin/libreoffice', '/usr/local/bin/soffice']
+            for path in common_paths:
+                if Path(path).exists():
+                    return path
+
+            return None
+
+        return None
+
     def _convert_docx_to_images(self, docx_path, dpi=150):
         """
         Convert .docx pages to images using LibreOffice and pdf2image.
@@ -159,6 +217,11 @@ class DocumentProcessor:
 
         print(f"Converting {docx_path} to images...")
 
+        # Find LibreOffice executable
+        libreoffice_path = self._find_libreoffice()
+        if not libreoffice_path:
+            raise Exception("LibreOffice not found. Please install LibreOffice to use the image conversion feature.")
+
         # Create temporary directory for conversion
         temp_dir = Path(tempfile.mkdtemp(prefix='docx2img_'))
 
@@ -166,9 +229,9 @@ class DocumentProcessor:
             # Step 1: Convert .docx to PDF using LibreOffice
             pdf_path = temp_dir / "temp.pdf"
 
-            print(f"  Step 1: Converting .docx to PDF...")
+            print(f"  Step 1: Converting .docx to PDF using LibreOffice...")
             result = subprocess.run([
-                'libreoffice',
+                libreoffice_path,
                 '--headless',  # Run without GUI
                 '--convert-to', 'pdf',
                 '--outdir', str(temp_dir),
