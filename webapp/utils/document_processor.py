@@ -562,8 +562,15 @@ class DocumentProcessor:
             left_para.paragraph_format.space_after = Pt(0)
             left_para.paragraph_format.line_spacing = 1.0
 
-            # Try to add logo image (smaller to reduce header height)
-            logo_path = self.assets_dir / 'park_logo.png'
+            # Try to add logo image (use EEI logo for EEI division, Park logo otherwise)
+            division = metadata.get('division', 'PARK')
+            if division == 'EEI':
+                logo_path = self.assets_dir / 'eei_logo.png'
+                logo_name = "EEI"
+            else:
+                logo_path = self.assets_dir / 'park_logo.png'
+                logo_name = "Park"
+
             logo_added = False
 
             if logo_path.exists():
@@ -571,7 +578,7 @@ class DocumentProcessor:
                     run = left_para.add_run()
                     run.add_picture(str(logo_path), height=Inches(0.4))  # Reduced from 0.5
                     logo_added = True
-                    print(f"Successfully added Park logo from: {logo_path}")
+                    print(f"Successfully added {logo_name} logo from: {logo_path}")
                 except Exception as e:
                     print(f"Error adding logo image: {e}")
                     import traceback
@@ -579,10 +586,11 @@ class DocumentProcessor:
 
             # If logo couldn't be loaded, use text fallback
             if not logo_added:
-                left_para.text = "PARK EVALUATION SERVICES"
+                fallback_text = "PARK EVALUATION SERVICES" if division != 'EEI' else "EEI"
+                left_para.text = fallback_text
                 left_para.runs[0].font.bold = True
                 left_para.runs[0].font.size = Pt(9)  # Reduced from 10
-                print(f"Warning: Park logo file not found at: {logo_path}")
+                print(f"Warning: {logo_name} logo file not found at: {logo_path}")
 
             # Right cell - Contact info
             right_cell = header_table.rows[0].cells[1]
@@ -693,10 +701,12 @@ class DocumentProcessor:
             tblCellSpacing.set(qn('w:type'), 'dxa')
             tblPr.append(tblCellSpacing)
 
-            # Left - Case number
+            # Left - Case number (use EEI or Park based on division)
             left_cell = footer_table.rows[0].cells[0]
             left_para = left_cell.paragraphs[0]
-            left_para.text = f"Park Case #{metadata['case_number']}"
+            division = metadata.get('division', 'PARK')
+            case_prefix = "EEI" if division == 'EEI' else "Park"
+            left_para.text = f"{case_prefix} Case #{metadata['case_number']}"
             left_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
             left_para.paragraph_format.space_before = Pt(0)
             left_para.paragraph_format.space_after = Pt(0)
@@ -1364,8 +1374,17 @@ class DocumentProcessor:
         logo_para = doc.add_paragraph()
         logo_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
-        # Try to add logo image
-        logo_path = self.assets_dir / 'park_logo.png'
+        # Try to add logo image (use EEI logo for EEI division, Park logo otherwise)
+        division = metadata.get('division', 'PARK')
+        if division == 'EEI':
+            logo_path = self.assets_dir / 'eei_logo.png'
+            logo_name = "EEI"
+            fallback_text = "EEI"
+        else:
+            logo_path = self.assets_dir / 'park_logo.png'
+            logo_name = "Park"
+            fallback_text = "PARK EVALUATION SERVICES"
+
         logo_added = False
 
         if logo_path.exists():
@@ -1373,18 +1392,18 @@ class DocumentProcessor:
                 run = logo_para.add_run()
                 run.add_picture(str(logo_path), height=Inches(0.8))
                 logo_added = True
-                print(f"Successfully added Park logo to Park certificate from: {logo_path}")
+                print(f"Successfully added {logo_name} logo to {logo_name} certificate from: {logo_path}")
             except Exception as e:
-                print(f"Error adding logo image to Park certificate: {e}")
+                print(f"Error adding logo image to {logo_name} certificate: {e}")
                 import traceback
                 traceback.print_exc()
 
         # If logo couldn't be loaded, use text fallback
         if not logo_added:
-            run = logo_para.add_run("PARK EVALUATION SERVICES")
+            run = logo_para.add_run(fallback_text)
             run.font.size = Pt(14)
             run.font.bold = True
-            print(f"Warning: Park logo file not found at: {logo_path}")
+            print(f"Warning: {logo_name} logo file not found at: {logo_path}")
 
         # Add DATE at top right (with actual date)
         date_para = doc.add_paragraph()
@@ -1466,32 +1485,36 @@ class DocumentProcessor:
         doc.add_paragraph()  # Additional spacing
         doc.add_paragraph()  # Additional spacing
 
-        # Footer with contact info image
-        footer_para = doc.add_paragraph()
-        footer_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        # Footer with contact info image - skip for EEI division
+        division = metadata.get('division', 'PARK')
+        if division != 'EEI':
+            footer_para = doc.add_paragraph()
+            footer_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
-        # Try to add contact info image
-        contact_img_path = self.assets_dir / 'park_contact.png'
-        contact_img_added = False
+            # Try to add contact info image
+            contact_img_path = self.assets_dir / 'park_contact.png'
+            contact_img_added = False
 
-        if contact_img_path.exists():
-            try:
-                run = footer_para.add_run()
-                run.add_picture(str(contact_img_path), width=Inches(4.375))  # 3.5 * 1.25 = 25% larger
-                contact_img_added = True
-                print(f"Successfully added contact info image from: {contact_img_path}")
-            except Exception as e:
-                print(f"Error adding contact info image: {e}")
-                import traceback
-                traceback.print_exc()
+            if contact_img_path.exists():
+                try:
+                    run = footer_para.add_run()
+                    run.add_picture(str(contact_img_path), width=Inches(4.375))  # 3.5 * 1.25 = 25% larger
+                    contact_img_added = True
+                    print(f"Successfully added contact info image from: {contact_img_path}")
+                except Exception as e:
+                    print(f"Error adding contact info image: {e}")
+                    import traceback
+                    traceback.print_exc()
 
-        # Fallback to text if image not available
-        if not contact_img_added:
-            run = footer_para.add_run("(212) 581-8877 • www.ParkEval.com")
-            run.font.name = 'Arial'
-            run.font.size = Pt(13)
-            run.font.color.rgb = RGBColor(97, 145, 43)
-            print(f"Warning: Contact info image not found at: {contact_img_path}")
+            # Fallback to text if image not available
+            if not contact_img_added:
+                run = footer_para.add_run("(212) 581-8877 • www.ParkEval.com")
+                run.font.name = 'Arial'
+                run.font.size = Pt(13)
+                run.font.color.rgb = RGBColor(97, 145, 43)
+                print(f"Warning: Contact info image not found at: {contact_img_path}")
+        else:
+            print("Skipping contact info image (EEI division)")
 
         # Save certificate
         doc.save(output_file)
