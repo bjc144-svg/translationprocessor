@@ -423,26 +423,56 @@ class DocumentProcessor:
             para.paragraph_format.line_spacing = 1.0
             run = para.add_run()
 
-            # Calculate image width based on page size and margins
-            # If we have source section info, use it; otherwise use defaults
+            # Calculate image dimensions to fit within available space
+            # We need to account for margins AND header/footer space
             if source_section:
                 page_width = source_section.page_width
+                page_height = source_section.page_height
                 left_margin = source_section.left_margin
                 right_margin = source_section.right_margin
-                content_width = page_width - left_margin - right_margin
+                top_margin = source_section.top_margin
+                bottom_margin = source_section.bottom_margin
 
-                # Get the actual image dimensions to calculate proper height
+                # Calculate available content area
+                available_width = page_width - left_margin - right_margin
+
+                # Header/footer distances (will be set to 0.15" later)
+                header_distance = Inches(0.15)
+                footer_distance = Inches(0.15)
+
+                # Estimate header/footer heights (conservative estimates)
+                # Header: logo (0.4") + table spacing + line = ~0.6"
+                # Footer: line + title + table = ~0.5"
+                header_height = Inches(0.6)
+                footer_height = Inches(0.5)
+
+                # Available height for content (accounting for header/footer)
+                available_height = (page_height - top_margin - bottom_margin -
+                                  header_distance - footer_distance -
+                                  header_height - footer_height)
+
+                # Get the actual image dimensions
                 img_width_px, img_height_px = page_image.size
                 img_aspect_ratio = img_height_px / img_width_px
 
-                print(f"    Page {page_num + 1}: {page_width/Inches(1):.2f}\" x {source_section.page_height/Inches(1):.2f}\", content width: {content_width/Inches(1):.2f}\"")
+                # Calculate image size to fit within available space
+                # Try fitting by width first
+                img_width = available_width
+                img_height = img_width * img_aspect_ratio
+
+                # If height exceeds available space, scale down
+                if img_height > available_height:
+                    img_height = available_height
+                    img_width = img_height / img_aspect_ratio
+
+                print(f"    Page {page_num + 1}: {page_width/Inches(1):.2f}\" x {page_height/Inches(1):.2f}\", "
+                      f"image: {img_width/Inches(1):.2f}\" x {img_height/Inches(1):.2f}\"")
             else:
                 # Default to letter size
-                content_width = Inches(6.5)
+                img_width = Inches(6.5)
 
-            # Add the image - use calculated content width
-            # The image will maintain its aspect ratio
-            run.add_picture(img_bytes, width=content_width)
+            # Add the image with calculated dimensions
+            run.add_picture(img_bytes, width=img_width)
 
             # Add section break after this page (except for the last page)
             if page_num < total_pages - 1:
@@ -691,7 +721,10 @@ class DocumentProcessor:
             run.font.size = Pt(8)  # Reduced from 9
 
             # Add NUMPAGES field (total pages)
-            self._add_num_pages(center_para)
+            # Calculate how many certificate pages to exclude
+            division = metadata.get('division', 'PARK')
+            num_cert_pages = 1 if division == 'EEI' else 2  # EEI: Park only, Others: Translator + Park
+            self._add_num_pages(center_para, num_cert_pages)
 
             # Right - Language pair
             right_cell = footer_table.rows[0].cells[2]
@@ -739,8 +772,13 @@ class DocumentProcessor:
         run._r.append(fldChar2)
         run.font.size = Pt(8)  # Reduced from 9
 
-    def _add_num_pages(self, paragraph):
-        """Add formula field to calculate NUMPAGES - 2 (excludes 2 certificate pages)"""
+    def _add_num_pages(self, paragraph, pages_to_exclude=2):
+        """Add formula field to calculate NUMPAGES - N (excludes certificate pages)
+
+        Args:
+            paragraph: Paragraph to add the field to
+            pages_to_exclude: Number of certificate pages to exclude (1 for EEI, 2 for others)
+        """
         run = paragraph.add_run()
 
         # Begin formula field
@@ -770,10 +808,10 @@ class DocumentProcessor:
         fldChar_numpages_end.set(qn('w:fldCharType'), 'end')
         run._r.append(fldChar_numpages_end)
 
-        # Formula instruction end: " - 2"
+        # Formula instruction end: " - N" (where N is pages_to_exclude)
         instrText_formula_end = OxmlElement('w:instrText')
         instrText_formula_end.set(qn('xml:space'), 'preserve')
-        instrText_formula_end.text = ' - 2'
+        instrText_formula_end.text = f' - {pages_to_exclude}'
         run._r.append(instrText_formula_end)
 
         # End formula field
