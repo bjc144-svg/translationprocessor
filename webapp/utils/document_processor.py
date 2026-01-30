@@ -200,6 +200,73 @@ class DocumentProcessor:
 
         return None
 
+    def _find_poppler(self):
+        """
+        Find poppler binaries path (cross-platform).
+
+        Returns:
+            Path to poppler bin directory, or None if not found
+        """
+        import platform
+        from pathlib import Path
+
+        system = platform.system()
+
+        if system == 'Windows':
+            # Common poppler installation paths on Windows
+            possible_paths = [
+                r"C:\Program Files\poppler\Library\bin",
+                r"C:\Program Files (x86)\poppler\Library\bin",
+                r"C:\poppler\Library\bin",
+                r"C:\Program Files\poppler-24.02.0\Library\bin",  # Version-specific
+                r"C:\Program Files\poppler-23.11.0\Library\bin",
+                Path(os.environ.get('PROGRAMFILES', 'C:\\Program Files')) / 'poppler' / 'Library' / 'bin',
+                Path(os.environ.get('LOCALAPPDATA', 'C:\\Users\\' + os.environ.get('USERNAME', 'User') + '\\AppData\\Local')) / 'poppler' / 'Library' / 'bin',
+            ]
+
+            # Also check if poppler is in PATH
+            import subprocess
+            try:
+                result = subprocess.run(['where', 'pdftoppm.exe'],
+                                      capture_output=True, text=True, timeout=5)
+                if result.returncode == 0 and result.stdout.strip():
+                    # Get the directory containing pdftoppm.exe
+                    pdftoppm_path = result.stdout.strip().split('\n')[0]
+                    return str(Path(pdftoppm_path).parent)
+            except:
+                pass
+
+            for path in possible_paths:
+                if isinstance(path, str):
+                    path = Path(path)
+                if path.exists() and (path / 'pdftoppm.exe').exists():
+                    print(f"  Found poppler at: {path}")
+                    return str(path)
+
+            return None
+
+        elif system == 'Linux' or system == 'Darwin':
+            # On Linux/Mac, poppler is usually in PATH
+            import subprocess
+            try:
+                result = subprocess.run(['which', 'pdftoppm'],
+                                      capture_output=True, text=True, timeout=5)
+                if result.returncode == 0 and result.stdout.strip():
+                    # Return the directory, not the full path to pdftoppm
+                    return str(Path(result.stdout.strip()).parent)
+            except:
+                pass
+
+            # Try common paths
+            common_paths = ['/usr/bin', '/usr/local/bin']
+            for path in common_paths:
+                if Path(path).exists() and (Path(path) / 'pdftoppm').exists():
+                    return path
+
+            return None
+
+        return None
+
     def _convert_docx_to_images(self, docx_path, dpi=150):
         """
         Convert .docx pages to images using LibreOffice and pdf2image.
@@ -220,7 +287,27 @@ class DocumentProcessor:
         # Find LibreOffice executable
         libreoffice_path = self._find_libreoffice()
         if not libreoffice_path:
-            raise Exception("LibreOffice not found. Please install LibreOffice to use the image conversion feature.")
+            raise Exception(
+                "LibreOffice not found. Please install LibreOffice from https://www.libreoffice.org/download/"
+            )
+
+        # Find poppler binaries
+        poppler_path = self._find_poppler()
+        if not poppler_path:
+            import platform
+            if platform.system() == 'Windows':
+                raise Exception(
+                    "Poppler not found. Please install poppler for Windows:\n"
+                    "1. Download from: https://github.com/oschwartz10612/poppler-windows/releases/\n"
+                    "2. Extract to C:\\Program Files\\poppler\\ (or any location)\n"
+                    "3. The bin folder should contain pdftoppm.exe and pdfinfo.exe"
+                )
+            else:
+                raise Exception(
+                    "Poppler not found. Please install poppler:\n"
+                    "- Ubuntu/Debian: sudo apt-get install poppler-utils\n"
+                    "- macOS: brew install poppler"
+                )
 
         # Create temporary directory for conversion
         temp_dir = Path(tempfile.mkdtemp(prefix='docx2img_'))
@@ -254,7 +341,8 @@ class DocumentProcessor:
                 str(pdf_path),
                 dpi=dpi,
                 fmt='png',  # PNG for better quality
-                thread_count=2  # Use multiple threads for faster conversion
+                thread_count=2,  # Use multiple threads for faster conversion
+                poppler_path=poppler_path  # Provide poppler path for Windows
             )
 
             print(f"  ✓ Converted {len(images)} pages to images")
