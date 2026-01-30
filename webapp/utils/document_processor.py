@@ -111,21 +111,32 @@ class DocumentProcessor:
                 translation_docx = temp_path / "translation_with_header.docx"
                 self.add_header_footer(input_file, translation_docx, metadata)
 
-                # Step 2: Create translator certificate
-                print("Step 2: Creating translator certificate...")
-                translator_cert_docx = temp_path / "translator_certificate.docx"
-                self.create_translator_certificate(translator_cert_docx, metadata)
+                # Determine which certificates to include based on division
+                division = metadata.get('division', 'PARK')
+                include_translator_cert = (division != 'EEI')
+
+                documents_to_combine = [translation_docx]
+
+                # Step 2: Create translator certificate (skip if division is EEI)
+                if include_translator_cert:
+                    print("Step 2: Creating translator certificate...")
+                    translator_cert_docx = temp_path / "translator_certificate.docx"
+                    self.create_translator_certificate(translator_cert_docx, metadata)
+                    documents_to_combine.append(translator_cert_docx)
+                else:
+                    print("Step 2: Skipping translator certificate (division is EEI)...")
 
                 # Step 3: Create Park certificate
                 print("Step 3: Creating Park certificate...")
                 park_cert_docx = temp_path / "park_certificate.docx"
                 self.create_park_certificate(park_cert_docx, metadata)
+                documents_to_combine.append(park_cert_docx)
 
                 # Step 4: Combine documents
-                print("Step 4: Combining documents...")
+                print(f"Step 4: Combining documents ({len(documents_to_combine)} total)...")
                 combined_docx = temp_path / "combined.docx"
                 self.combine_documents(
-                    [translation_docx, translator_cert_docx, park_cert_docx],
+                    documents_to_combine,
                     combined_docx
                 )
 
@@ -380,9 +391,14 @@ class DocumentProcessor:
                 p_element = para._element
                 p_element.getparent().remove(p_element)
 
-        # Get page setup from original document (for first section at least)
+        # Get page setup from original document for each page/section
         original_doc = Document(input_file)
-        source_section = original_doc.sections[0] if original_doc.sections else None
+        print(f"Original document has {len(original_doc.sections)} section(s)")
+
+        # Build a list of page properties from source document
+        # Each source section may contain multiple pages, but we need per-page info
+        # We'll map each output page to the appropriate source section
+        source_sections = list(original_doc.sections)
 
         # Add each page image to the document
         from io import BytesIO
@@ -390,23 +406,43 @@ class DocumentProcessor:
         for page_num, page_image in enumerate(page_images):
             print(f"  Adding page {page_num + 1}/{total_pages} as image...")
 
+            # Determine which source section this page belongs to
+            # For simplicity, we'll map linearly if we have fewer sections than pages
+            source_section_idx = min(page_num, len(source_sections) - 1) if source_sections else 0
+            source_section = source_sections[source_section_idx] if source_sections else None
+
             # Save image to bytes
             img_bytes = BytesIO()
             page_image.save(img_bytes, format='PNG')
             img_bytes.seek(0)
 
             # Add paragraph with full-page image
-            # Set image width to match page content width (accounting for margins)
-            # Standard letter page is 8.5" wide with 1" margins on each side = 6.5" content width
             para = doc.add_paragraph()
             para.paragraph_format.space_before = Pt(0)
             para.paragraph_format.space_after = Pt(0)
             para.paragraph_format.line_spacing = 1.0
             run = para.add_run()
 
-            # Add the image - use width to match page content area
+            # Calculate image width based on page size and margins
+            # If we have source section info, use it; otherwise use defaults
+            if source_section:
+                page_width = source_section.page_width
+                left_margin = source_section.left_margin
+                right_margin = source_section.right_margin
+                content_width = page_width - left_margin - right_margin
+
+                # Get the actual image dimensions to calculate proper height
+                img_width_px, img_height_px = page_image.size
+                img_aspect_ratio = img_height_px / img_width_px
+
+                print(f"    Page {page_num + 1}: {page_width/Inches(1):.2f}\" x {source_section.page_height/Inches(1):.2f}\", content width: {content_width/Inches(1):.2f}\"")
+            else:
+                # Default to letter size
+                content_width = Inches(6.5)
+
+            # Add the image - use calculated content width
             # The image will maintain its aspect ratio
-            run.add_picture(img_bytes, width=Inches(6.5))
+            run.add_picture(img_bytes, width=content_width)
 
             # Add section break after this page (except for the last page)
             if page_num < total_pages - 1:
@@ -424,10 +460,14 @@ class DocumentProcessor:
         print(f"Added {total_pages} page images to document")
         print(f"Document now has {len(doc.sections)} section(s)")
 
-        # Copy page setup from source document if available
-        if source_section:
-            print("Copying page setup from source document...")
-            for section in doc.sections:
+        # Copy page setup from source document on a per-section basis
+        print("Copying page setup from source document (per-page)...")
+        for section_idx, section in enumerate(doc.sections):
+            # Map each output section to corresponding source section
+            source_section_idx = min(section_idx, len(source_sections) - 1) if source_sections else 0
+            source_section = source_sections[source_section_idx] if source_sections else None
+
+            if source_section:
                 try:
                     section.top_margin = source_section.top_margin
                     section.bottom_margin = source_section.bottom_margin
@@ -436,8 +476,9 @@ class DocumentProcessor:
                     section.page_height = source_section.page_height
                     section.page_width = source_section.page_width
                     section.orientation = source_section.orientation
+                    print(f"  Section {section_idx}: {section.page_width/Inches(1):.2f}\" x {section.page_height/Inches(1):.2f}\", orientation: {section.orientation}")
                 except Exception as e:
-                    print(f"Warning: Could not copy all page setup properties: {e}")
+                    print(f"Warning: Could not copy page setup for section {section_idx}: {e}")
 
         # Apply header/footer to ALL sections
         print("Adding headers and footers to all sections...")
