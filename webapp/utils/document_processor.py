@@ -314,7 +314,7 @@ class DocumentProcessor:
 
         return None
 
-    def _convert_docx_to_images(self, docx_path, dpi=150):
+    def _convert_docx_to_images(self, docx_path, dpi=120):
         """
         Convert .docx pages to images using LibreOffice and pdf2image.
 
@@ -416,7 +416,7 @@ class DocumentProcessor:
         print("Converting source document pages to images for perfect visual preservation...")
 
         # Convert source document pages to images
-        page_images = self._convert_docx_to_images(input_file, dpi=150)
+        page_images = self._convert_docx_to_images(input_file, dpi=120)
         total_pages = len(page_images)
 
         print(f"Converted {total_pages} pages to images. Creating new document with headers/footers...")
