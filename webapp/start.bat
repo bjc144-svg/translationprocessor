@@ -46,7 +46,7 @@ echo Installing dependencies...
 echo This may take a few minutes on first run...
 echo.
 
-pip install --upgrade pip setuptools wheel --quiet
+python -m pip install --upgrade pip setuptools wheel --quiet
 pip install -r requirements.txt
 
 if errorlevel 1 (
